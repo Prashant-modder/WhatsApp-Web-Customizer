@@ -1,0 +1,1 @@
+"undefined"!=typeof window&&(window.track=function(e,t){try{chrome.runtime.sendMessage({type:"analytics:capture",event:e,properties:t||{}})}catch(e){}},window.getAnalyticsDistinctId=function(){try{return chrome.runtime.sendMessage({type:"analytics:getDistinctId"}).then(e=>e&&e.value||null).catch(()=>null)}catch(e){return Promise.resolve(null)}});

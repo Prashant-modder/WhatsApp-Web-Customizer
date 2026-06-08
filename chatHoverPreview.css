@@ -1,0 +1,10 @@
+#xh-tooltip-container {
+  position: fixed;
+  z-index: 1000;
+  background-color: var(--WDS-background-wash-inset, #161717);
+  padding: 10px;
+  border: 1px solid #111b21;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  width: 300px;
+}

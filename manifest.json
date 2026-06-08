@@ -1,0 +1,67 @@
+{
+  "manifest_version": 3,
+  "name": "WhatsApp Web Customizer – Themes, Fonts, Backgrounds & Quick Reply Bubbles",
+  "version": "1.1.10",
+  "description": "Personalize WhatsApp Web with themes, fonts, backgrounds, and fast-reply tools. Lightweight, clean, and fully open source.",
+  "permissions": ["storage", "scripting", "clipboardRead", "alarms"],
+  "optional_host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "WhatsApp Web Customizer"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icon/icon16.png",
+    "48": "icon/icon48.png",
+    "128": "icon/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/"],
+      "js": [
+        "track.js",
+        "fontFamilyChange.js",
+        "changeContent.js",
+        "quick-reply-bubbles.js",
+        "themes-presets.js",
+        "themes-content.js",
+        "reviewPrompt.js",
+        "water-bubbles.js",
+        "gradient-mesh.js",
+        "liquid-marble.js",
+        "cozy-window.js",
+        "animated-bg.js",
+        "adjustableChatList.js",
+        "chatHoverPreview.js",
+        "privacy-blur.js",
+        "dynamic-features.js",
+        "content.js"
+      ],
+      "css": ["adjustableChatList.css", "chatHoverPreview.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/",
+    "https://eu.i.posthog.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "themes-overrides.css",
+        "icon/icon128.png",
+        "backgrounds/animated/*/index.html",
+        "backgrounds/animated/*/thumbnail.png",
+        "backgrounds/animated/*/thumbnail.gif",
+        "backgrounds/animated/*/thumbnail.svg"
+      ],
+      "matches": ["https://web.whatsapp.com/*"]
+    }
+  ]
+}

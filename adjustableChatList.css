@@ -1,0 +1,30 @@
+/* Style for the chat list */
+.xh-resizable-sidebar {
+  position: relative;
+  overflow: auto;
+  min-width: 80px;
+  transition: max-width 0.2s ease-in-out;
+  border-right: 1px solid rgba(var(--WDS-content-default-RGB, 0, 0, 0), 0.1);
+}
+
+/* Pseudo-element for resize handle */
+.xh-resizable-sidebar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0; /* span the full height of the chat list */
+  right: 0;
+  width: 10px; /* Width of the resize area */
+  cursor: ew-resize; /* Cursor for east-west resizing */
+  z-index: 110;
+  transition: background-color 0.2s ease-in-out;
+}
+
+/* when hover over resize area */
+.xh-resizable-sidebar:hover::after {
+  background-color: rgba(0, 163, 212, 0.5);
+}
+
+.xh-resizable-sidebar.xh-resizing {
+  transition: none;
+}
