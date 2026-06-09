@@ -6,13 +6,14 @@ Single source of truth for every PostHog event this extension emits.
 - **Identity.** A random UUID generated on first install (`analytics_distinct_id` in `chrome.storage.local`). No email, phone, or WhatsApp identity.
 - **Privacy contract.** Property values are fixed enums, counts, durations, or extension-internal IDs (preset IDs, animation registry IDs, checkbox names from `popup.html`). **Zero user-entered text** — never theme names, never quick-reply text, never message/chat content, never file paths beyond extensions, never URLs. The contract is enforced by callers; the privacy policy and the options page disclose its existence.
 - **Theme IDs** pass through `WA_SAFE_THEME_ID_FOR_ANALYTICS()` (in `themes-presets.js`), which collapses legacy name-slugged custom IDs to the literal `"custom-legacy"`. Preset and new-format custom IDs pass through unchanged.
+- **Font IDs** pass through `WA_SAFE_FONT_ID_FOR_ANALYTICS()` (in `fonts-presets.js`), the exact analogue for the Fonts feature. It maps `preset-*` and new-format `custom-*` IDs through unchanged and collapses anything else to `"custom-legacy"`. Font *family names*, *URLs*, and *file names* are user-entered text and are NEVER emitted — only IDs, counts, enums, and file sizes.
 
 ## Conventions
 
 - Event names: `snake_case`, past tense for completed actions.
 - Property names: `snake_case`.
 - **`source`** is the canonical property for "where in the UI did the user come from."
-- **`from_page`** is reserved for the specific case where `source` is already taken for a different axis. Today this applies only to `theme_applied`, where `source` discriminates `"preset"` vs `"custom"` (the theme *type*) and `from_page` carries the entry surface (`"manage"`). This is a documented exception, not an accident — when reusing `source` would cause a semantic collision, use `from_page`.
+- **`from_page`** is reserved for the specific case where `source` is already taken for a different axis. This applies to `theme_applied` and its Fonts twin `font_applied`, where `source` discriminates `"preset"` vs `"custom"` (the item *type*) and `from_page` carries the entry surface (`"manage"`). This is a documented exception, not an accident — when reusing `source` would cause a semantic collision, use `from_page`.
 - Failure events carry a stable `reason` or `error_code` enum, never free-text English.
 - Property `version` collisions: see `extension_updated` below; version-transition events use `previous_version`/`version`, never `from`/`to`.
 
@@ -400,22 +401,128 @@ After cutover, consumers should query the canonical name only. The PR that remov
 
 ### Typography
 
-#### `font_family_changed`
-- **Q:** Which fonts are tried? How much exploration before settling?
-- **Trigger:** Each font dropdown change. (`font_family_session_settled` provides the destination view.)
-- **Properties:**
-  - `font` *(enum)* — value of the `<select>` in `popup.html`. Empty string for "Nothing".
+> **Removed in 1.1.12.** The single font-family `<select>` was replaced by the full Font
+> Manager (a Presets/Custom card grid + upload/URL/create). With it, `fontFamilyChange.js`
+> and these two events were removed — they no longer fire. Their successors are the
+> `font_applied` / Fonts-feature events below. Migrate any dashboards built on them.
+>
+> - ~~`font_family_changed`~~ → use `font_applied` (popup-side card selection).
+> - ~~`font_family_session_settled`~~ → no direct replacement; per-selection `font_applied`
+>   plus the `popup_opened.font_set` flag cover the "did they settle on a font" question.
 
-#### `font_family_session_settled`
-- **Q:** Where do users LAND when exploring fonts? Per-step `font_family_changed` answers a different question.
-- **Trigger rules (exact):**
-  - At most ONCE per popup session.
-  - Fires on `pagehide` IFF the user changed the font at least once in this session (we use `pagehide`, not `beforeunload` — the latter fires unreliably for extension popups).
-  - Also fires after 60 seconds of inactivity on the font setting (idle catch).
-  - Does NOT fire if the user opened the popup but never touched the font control.
+#### `font_applied`
+- **Q:** Which fonts are most popular? Are presets or custom (uploaded/URL/created) fonts preferred?
+- **Trigger:** User clicks a font card — in the popup Typography grid or the Font Manager.
 - **Properties:**
-  - `final_font` *(string)* — last selected value (matches `font_family_changed.font` enum).
-  - `changes_in_session` *(number)* — count of `font_family_changed` events in this popup session.
+  - `font_id` *(string)* — preset ID (e.g. `"preset-roboto"`), new-format custom ID, or `"custom-legacy"`. Always PII-safe via `WA_SAFE_FONT_ID_FOR_ANALYTICS()`.
+  - `source` *(enum)* — `"preset" | "custom"` (font type — not the entry point).
+  - `from_page` *(string, optional)* — `"manage"` when applied from the Font Manager; absent on popup-side applies. Documented `from_page` exception (see Conventions), identical to `theme_applied`.
+
+#### `font_reset`
+- **Q:** How often do users revert to WhatsApp's default font?
+- **Trigger:** User clicks Reset in the popup Typography tab.
+
+#### `font_manager_opened`
+- **Q:** Which entry point drove the user into the Font Manager? Discovery funnel for the Fonts feature.
+- **Trigger:** User opens `fonts.html`.
+- **Properties:**
+  - `source` *(enum, optional)* — `"create_button" | "popup_custom_empty_state" | "popup_custom_subtab"`; absent when opened via the "Manage Fonts" button (mirrors `theme_manager_opened`).
+
+#### `fonts_subtab_changed`
+- **Q:** Do users with custom fonts prefer that sub-tab over Presets in the popup?
+- **Trigger:** Switching Presets / Custom inside the popup Typography tab.
+- **Properties:**
+  - `from_subtab` *(enum)* — `"presets" | "custom"`.
+  - `to_subtab` *(same enum)*.
+  - `custom_font_count` *(number)* — count at firing time.
+
+### Font Manager page
+
+#### `font_manager_subtab_changed`
+- **Q:** Which sub-tab does the user prefer on the Font Manager?
+- **Trigger:** Switching Custom / Presets in the Font Manager.
+- **Properties:**
+  - `from_subtab` *(enum)* — `"custom" | "presets"`.
+  - `to_subtab` *(same enum)*.
+  - `custom_font_count` *(number)*.
+
+#### `font_creator_opened`
+- **Q:** Where do users open the Create/Edit Font editor from?
+- **Trigger:** Editor modal opens.
+- **Properties:**
+  - `mode` *(enum)* — `"create" | "edit"`.
+  - `source` *(enum)* — `"font_manager" | "duplicate_preset" | "duplicate_custom"`.
+  - `font_id` *(string | null)* — present only when editing an existing custom font.
+
+#### `font_creator_closed`
+- **Q:** How often do users abandon the editor without saving?
+- **Trigger:** Cancel / X / backdrop click / Escape (NOT a successful save — save fires `custom_font_saved` and skips this event).
+- **Properties:**
+  - `mode` *(enum)* — `"create" | "edit"`.
+  - `had_unsaved_changes` *(boolean)*.
+
+#### `custom_font_saved`
+- **Q:** How are custom fonts being created — by Google family name, uploaded file, or URL? Create vs edit?
+- **Trigger:** Successful save in the editor.
+- **Properties:**
+  - `mode` *(enum)* — `"create" | "edit"`.
+  - `font_id` *(string)* — via `WA_SAFE_FONT_ID_FOR_ANALYTICS()`.
+  - `name_length` *(number)*.
+  - `source` *(enum)* — `"font_manager" | "duplicate_preset" | "duplicate_custom"`.
+  - `font_type` *(enum)* — `"google" | "url" | "file"`.
+  - `overwrote_existing` *(boolean)*.
+
+#### `custom_font_save_blocked_empty`
+- **Q:** How often do users try to save a font with no name?
+- **Trigger:** Save clicked while the name field is empty (`font-name-validation.js`).
+
+#### `font_deleted`
+- **Q:** Which fonts get deleted, and was the deleted font active at the time?
+- **Trigger:** Custom font deletion (after confirm).
+- **Properties:**
+  - `font_id` *(string)* — safe-id.
+  - `was_active` *(boolean)*.
+
+#### `custom_font_delete_cancelled`
+- **Q:** How often do users back out of the delete confirm?
+- **Trigger:** Delete confirm dialog dismissed (Cancel).
+- **Properties:**
+  - `font_id` *(string)* — safe-id.
+
+#### `font_imported`
+- **Q:** How are users adding fonts — uploading files (drop vs picker) or loading from a URL?
+- **Trigger:** End of a file import (one or more files) or a URL add (success or partial success).
+- **Properties:**
+  - `method` *(enum)* — `"drop" | "file_picker" | "url"`.
+  - `added_count` *(number)* — fonts successfully added (font files + any valid JSON definitions).
+  - `failed_count` *(number)*.
+
+#### `font_import_rejected`
+- **Q:** Which rejection codes do failed font adds actually hit?
+- **Trigger:** One per rejected file/item/URL.
+- **Properties:**
+  - `reason` *(enum)* — first code in `error_codes`.
+  - `method` *(enum)* — `"drop" | "file_picker" | "url"`.
+  - `error_codes` *(string[])* — full list of stable codes for this rejection.
+  - `error_count` *(number)* — `error_codes.length`.
+  - `file_size_bytes` *(number | null)* — file size for uploads; `null` for URL adds.
+
+**Stable `error_codes` enum (rejecting):** `unsupported_type`, `too_large`, `parse_error`, `not_object`, `missing_name`, `missing_font`, `missing_family`, `invalid_font_type`, `missing_src`, `empty_url`, `invalid_url`, `storage_error`.
+
+#### `font_exported`
+- **Q:** Are users moving fonts between machines / sharing them?
+- **Trigger:** User clicks Export on a custom font card or "Export All".
+- **Properties:**
+  - `mode` *(enum)* — `"single" | "all"`.
+  - `count` *(number)*.
+
+#### `font_template_downloaded`
+- **Q:** Are users using the font-definition template?
+- **Trigger:** User clicks "Download template" in the Font Manager.
+- **Properties:**
+  - `source` *(enum)* — `"import_dialog"`.
+
+### Typography — font size
 
 #### `font_scale_changed`
 - **Q:** What scale settings are common?

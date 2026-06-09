@@ -22,7 +22,6 @@
 
         <script src="track.js" defer></script>
         <script src="popup-nav.js" defer></script>
-        <script src="fontFamilyChange.js" defer></script>
         <script src="popup.js" defer></script>
         <script src="feature-toggles-popup.js" defer></script>
         <script src="fontSizeChange.js" defer></script>
@@ -30,6 +29,8 @@
         <script src="quick-replies.js" defer></script>
         <script src="themes-presets.js" defer></script>
         <script src="themes.js" defer></script>
+        <script src="fonts-presets.js" defer></script>
+        <script src="fonts.js" defer></script>
         <script src="animated-bg-popup.js" defer></script>
         <script src="animated-bg-hint.js" defer></script>
 
@@ -568,16 +569,6 @@
                 text-align: center;
             }
 
-            /* Font live preview block */
-            #font-preview {
-                background: var(--wa-bg);
-                border: 1px solid var(--wa-border);
-                border-radius: 6px;
-                padding: 10px 12px;
-                font-size: 16px;
-                color: var(--wa-text);
-            }
-
             /* Collapse helper for the Effects accordion */
             .collapse:not(.show) {
                 display: none;
@@ -639,6 +630,31 @@
                 border-radius: 4px;
                 background: var(--wa-surface-2);
                 color: var(--wa-muted);
+            }
+
+            /* ── Font cards (reuse .theme-card; preview text in the swatch) ──
+               The font grid can grow long, so it scrolls inside a capped box
+               (.font-grid-scroll) which keeps the Font size control below it
+               reachable without scrolling the whole tab. */
+            .font-swatch {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            }
+            .font-sample {
+                font-size: 30px;
+                line-height: 1;
+                color: var(--wa-text);
+                white-space: nowrap;
+                padding: 0 8px;
+            }
+            .font-grid-scroll {
+                max-height: 280px;
+                overflow-y: auto;
+                overflow-x: hidden;
+                margin: 0 -2px 8px;
+                padding: 2px;
             }
         </style>
     </head>
@@ -1071,43 +1087,94 @@
 
                     <!-- ─────── TYPOGRAPHY ─────── -->
                     <section class="tab-pane fade" id="tab-typography">
-                        <h2 class="section-label mb-2">Font family</h2>
-                        <select id="fontSelector" class="form-select form-select-sm mb-2">
-                            <option value="">Nothing</option>
-                            <option value="Pacifico">Pacifico</option>
-                            <option value="Lobster">Lobster</option>
-                            <option value="Dancing+Script">Dancing Script</option>
-                            <option value="Roboto">Roboto</option>
-                            <option value="Open+Sans">Open Sans</option>
-                            <option value="Montserrat">Montserrat</option>
-                            <option value="Press+Start+2P">Press Start 2P</option>
-                            <option value="Indie+Flower">Indie Flower</option>
-                            <option value="Oswald">Oswald</option>
-                            <option value="Raleway">Raleway</option>
-                            <option value="Lora">Lora</option>
-                            <option value="Merriweather">Merriweather</option>
-                            <option value="PT+Sans">PT Sans</option>
-                            <option value="PT+Serif">PT Serif</option>
-                            <option value="Playfair+Display">Playfair Display</option>
-                            <option value="Quicksand">Quicksand</option>
-                            <option value="Ubuntu">Ubuntu</option>
-                            <option value="Fira+Sans">Fira Sans</option>
-                            <option value="Noto+Sans">Noto Sans</option>
-                            <option value="Raleway+Dots">Raleway Dots</option>
-                            <option value="Bebas+Neue">Bebas Neue</option>
-                            <option value="Arvo">Arvo</option>
-                            <option value="Cabin">Cabin</option>
-                            <option value="Amatic+SC">Amatic SC</option>
-                            <option value="Caveat">Caveat</option>
-                            <option value="Satisfy">Satisfy</option>
-                            <option value="Patua+One">Patua One</option>
-                            <option value="Fredoka+One">Fredoka One</option>
-                            <option value="Shadows+Into+Light">Shadows Into Light</option>
-                            <option value="Kalam">Kalam</option>
-                            <option value="Indie+Flower">Indie Flower</option>
-                        </select>
-                        <div id="font-preview" class="mb-4">
-                            The quick brown fox jumps over the lazy dog
+                        <!-- Toolbar: header + actions, mirroring the Themes tab so the
+                             two surfaces feel identical. Create / Manage Fonts / Reset
+                             stay above the fold; JS lives in fonts.js. -->
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h2 class="section-label m-0">Font family</h2>
+                            <div class="d-flex gap-2">
+                                <button id="create-font" type="button" class="btn btn-sm btn-success">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2.5"
+                                        stroke-linecap="round" stroke-linejoin="round"
+                                        style="margin-right:4px;vertical-align:-1px;">
+                                        <line x1="12" y1="5" x2="12" y2="19" />
+                                        <line x1="5" y1="12" x2="19" y2="12" />
+                                    </svg>
+                                    Create
+                                </button>
+                                <button id="open-font-manager" type="button" class="btn btn-sm btn-outline-success">
+                                    Manage Fonts
+                                </button>
+                                <button id="reset-font" type="button" class="btn btn-sm btn-outline-secondary">
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-secondary small mb-3">
+                            Click any font below to apply it instantly. Use
+                            <strong>Manage Fonts</strong> to upload your own or load one
+                            from a URL, or <strong>Reset</strong> to revert to WhatsApp's default.
+                        </p>
+
+                        <!-- Presets vs Custom — same .bg-subtabs/.bg-subtab pattern as Themes. -->
+                        <div class="bg-subtabs d-flex mb-3" role="tablist">
+                            <button
+                                type="button"
+                                class="bg-subtab active"
+                                data-fonts-subtab="fonts-presets"
+                                role="tab"
+                                aria-selected="true"
+                                aria-controls="fonts-presets"
+                            >Presets</button>
+                            <button
+                                type="button"
+                                class="bg-subtab"
+                                data-fonts-subtab="fonts-customs"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="fonts-customs"
+                            >Custom</button>
+                        </div>
+
+                        <!-- Capped, internally-scrolling grid: however many fonts the
+                             user adds, the Font size control below stays reachable
+                             without scrolling the whole tab. -->
+                        <div class="font-grid-scroll">
+                            <div class="bg-subpane" id="fonts-presets" role="tabpanel">
+                                <div class="row g-2" id="font-presets-grid"></div>
+                            </div>
+
+                            <div class="bg-subpane" id="fonts-customs" role="tabpanel" hidden>
+                                <button
+                                    id="font-customs-new"
+                                    type="button"
+                                    class="btn btn-sm btn-success w-100 mb-2"
+                                    style="display: none"
+                                >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2.5"
+                                        stroke-linecap="round" stroke-linejoin="round"
+                                        style="margin-right:4px;vertical-align:-1px;">
+                                        <line x1="12" y1="5" x2="12" y2="19" />
+                                        <line x1="5" y1="12" x2="19" y2="12" />
+                                    </svg>
+                                    New font
+                                </button>
+
+                                <div class="row g-2" id="font-customs-grid"></div>
+
+                                <div id="font-customs-empty" class="theme-empty" style="display: none">
+                                    <div class="theme-empty-headline">No custom fonts yet</div>
+                                    <p class="theme-empty-sub">
+                                        Upload a font, load one from a URL, or create one
+                                        from a Google Font.
+                                    </p>
+                                    <button id="font-customs-create" type="button" class="btn btn-sm btn-success">
+                                        Add your first font
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <h2 class="section-label mb-2">Font size</h2>
