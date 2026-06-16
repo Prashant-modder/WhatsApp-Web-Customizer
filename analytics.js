@@ -1,1 +1,313 @@
-!function(){const t="phc_D7eF9i6oXNgCTRHZ9VPHJNs5AaBudskFF36har3UYyPW",e="https://eu.i.posthog.com",n="analytics_distinct_id",i="analytics_queue";function a(){return crypto.randomUUID()}let s=null;function r(){return s||(s=(async()=>{const t=(await chrome.storage.local.get(n))[n];if(t)return t;const e=a();return await chrome.storage.local.set({[n]:e}),e})().catch(t=>{throw s=null,t})),s}const o=r;async function c(){try{if(!chrome.runtime||"function"!=typeof chrome.runtime.setUninstallURL)return;const t=await r(),e=new URL("https://olivierluethy.github.io/WhatsApp-Web-Pages/uninstall.html");e.searchParams.set("entry.1444409856",t),await chrome.runtime.setUninstallURL(e.toString())}catch(t){console.warn("[analytics] setupUninstallTracking failed:",t&&t.message)}}async function l(t,e={}){const n=await o(),s=chrome.runtime.getManifest(),r={event:t,properties:{...e,distinct_id:n,$insert_id:a(),$lib:"chrome-extension",extension_version:s.version,browser_language:"undefined"!=typeof navigator?navigator.language:void 0},timestamp:(new Date).toISOString()},c=await chrome.storage.local.get(i),l=Array.isArray(c[i])?c[i]:[];l.push(r),l.length>200&&l.splice(0,l.length-200),await chrome.storage.local.set({[i]:l})}async function u(){const n=await chrome.storage.local.get(i),s=Array.isArray(n[i])?n[i]:[];if(0===s.length)return;const r=s.slice(0,50),c=s.slice(50),l={api_key:t,batch:r.map(t=>({event:t.event,properties:t.properties,timestamp:t.timestamp,distinct_id:t.properties.distinct_id}))};let u=null;try{const t=await fetch(`${e}/batch/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(l),keepalive:!0});if(!t.ok)throw u=t.status,new Error(`PostHog returned ${t.status}`);const n=await chrome.storage.local.get(i),a=Array.isArray(n[i])?n[i]:[],s=a.slice(r.length),o=s.length<=c.length?s:c.concat(a.slice(c.length));await chrome.storage.local.set({[i]:o})}catch(n){console.warn("[analytics] flush failed, will retry:",n),function(n,i,s){const r=function(t){const e=t&&t.message?String(t.message):"";return/^PostHog returned/i.test(e)?"http_error":/network|fetch|TypeError|Failed to fetch/i.test(e)?"network_error":"unknown"}(n),c={status:r,error_class:r,endpoint_status:"number"==typeof s?s:null,batch_size:i};m>0&&(c.dropped_failure_reports=m,m=0);p.length>=h&&(p.shift(),m++);p.push({event:"analytics_flush_failed",properties:c,timestamp:(new Date).toISOString()}),async function(){if(g)return;if(0===p.length)return;g=!0;const n=p.slice();try{const i=await o(),s=chrome.runtime.getManifest(),r={api_key:t,batch:n.map(t=>({event:t.event,properties:{...t.properties,distinct_id:i,$insert_id:a(),$lib:"chrome-extension",extension_version:s.version,browser_language:"undefined"!=typeof navigator?navigator.language:void 0},timestamp:t.timestamp,distinct_id:i}))};(await fetch(`${e}/batch/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(r),keepalive:!0})).ok&&(p=p.slice(n.length))}catch(t){console.warn("[analytics] self-telemetry flush failed (silent):",t&&t.message)}finally{g=!1}}()}(n,r.length,u)}}const h=10;let p=[],m=0,g=!1;self.analytics={initAnalytics:function(){chrome.alarms.create("analytics_flush",{periodInMinutes:.5}),chrome.alarms.onAlarm.addListener(t=>{"analytics_flush"===t.name&&u()}),chrome.runtime.onMessage.addListener((t,e,n)=>{if(t&&"string"==typeof t.type)return"analytics:capture"===t.type?(l(t.event,t.properties).then(()=>n({ok:!0})),!0):"analytics:getDistinctId"===t.type?(o().then(t=>n({value:t})),!0):"analytics:flush"===t.type?(u().then(()=>n({ok:!0})),!0):void 0}),chrome.runtime.onInstalled.addListener(async t=>{const e=chrome.runtime.getManifest().version;"install"===t.reason?await l("extension_installed",{version:e}):"update"===t.reason&&t.previousVersion&&t.previousVersion!==e&&await l("extension_updated",{from:t.previousVersion,to:e,previous_version:t.previousVersion,version:e}),await c(),await u()}),chrome.runtime.onStartup.addListener(async()=>{await l("extension_started",{version:chrome.runtime.getManifest().version}),await c(),await u()})},capture:l,trackEvent:l,flush:u,getDistinctId:o,getOrCreateUserId:r,setupUninstallTracking:c}}();
+/* analytics.js — MV3 background analytics with resilient flushing.
+ *
+ * Task 6 (analytics resilience): a 7-day export showed analytics_flush_failed
+ * fired 214x across 48 users (~10% of the base): 204 network_error, 9 http
+ * 407 (corporate proxy auth), and 133 of these were batch_size:1 — the queue
+ * was retrying single events forever against a blocked endpoint (ad-blockers
+ * commonly block PostHog), burning cycles and losing ~10% of analytics.
+ *
+ * This rewrite keeps the public API, storage keys, capture format, alarm, and
+ * message/lifecycle wiring identical, and adds:
+ *   - exponential backoff with jitter between flush attempts,
+ *   - a circuit breaker that pauses flushing after N consecutive failures,
+ *   - a per-event retry cap so no event is retried forever (dropped events are
+ *     counted in aggregate via analytics_events_dropped, no PII),
+ *   - hard back-off on clearly-blocked endpoints (407/403),
+ *   - a bounded queue (unchanged 200 cap), with the resilience layer routing
+ *     its own best-effort events through the same queue so it can't create a
+ *     second retry storm.
+ *
+ * Flush state (consecutive failures, next-attempt time, circuit-open-until) is
+ * persisted, because the MV3 service worker is torn down between alarm wake-ups
+ * and in-memory state would otherwise reset on every tick.
+ */
+!(function () {
+  "use strict";
+
+  var API_KEY = "phc_D7eF9i6oXNgCTRHZ9VPHJNs5AaBudskFF36har3UYyPW";
+  var HOST = "https://eu.i.posthog.com";
+  var DISTINCT_ID_KEY = "analytics_distinct_id";
+  var QUEUE_KEY = "analytics_queue";
+  var FLUSH_STATE_KEY = "analytics_flush_state"; // additive, migration-safe
+
+  // Resilience tuning.
+  var QUEUE_CAP = 200; // max queued events (unchanged)
+  var BATCH_SIZE = 50; // events per POST (unchanged)
+  var MAX_ATTEMPTS = 8; // per-event retry cap before it is dropped
+  var BACKOFF_BASE_MS = 1000;
+  var BACKOFF_CAP_MS = 5 * 60 * 1000; // ~5 min ceiling
+  var CIRCUIT_THRESHOLD = 5; // consecutive failures before opening
+  var CIRCUIT_COOLDOWN_MS = 10 * 60 * 1000; // pause flushing while open
+
+  function newId() {
+    return crypto.randomUUID();
+  }
+
+  /* ── distinct id ─────────────────────────────────────────────────────── */
+
+  var distinctIdPromise = null;
+  function getOrCreateUserId() {
+    if (distinctIdPromise) return distinctIdPromise;
+    distinctIdPromise = (async () => {
+      var existing = (await chrome.storage.local.get(DISTINCT_ID_KEY))[DISTINCT_ID_KEY];
+      if (existing) return existing;
+      var id = newId();
+      await chrome.storage.local.set({ [DISTINCT_ID_KEY]: id });
+      return id;
+    })().catch((err) => {
+      distinctIdPromise = null;
+      throw err;
+    });
+    return distinctIdPromise;
+  }
+  var getDistinctId = getOrCreateUserId;
+
+  /* ── uninstall tracking ──────────────────────────────────────────────── */
+
+  async function setupUninstallTracking() {
+    try {
+      if (!chrome.runtime || typeof chrome.runtime.setUninstallURL !== "function") return;
+      var id = await getOrCreateUserId();
+      var url = new URL("https://olivierluethy.github.io/WhatsApp-Web-Pages/uninstall.html");
+      url.searchParams.set("entry.1444409856", id);
+      await chrome.runtime.setUninstallURL(url.toString());
+    } catch (err) {
+      console.warn("[analytics] setupUninstallTracking failed:", err && err.message);
+    }
+  }
+
+  /* ── queue helpers ───────────────────────────────────────────────────── */
+
+  async function getQueue() {
+    var data = await chrome.storage.local.get(QUEUE_KEY);
+    return Array.isArray(data[QUEUE_KEY]) ? data[QUEUE_KEY] : [];
+  }
+  async function setQueue(queue) {
+    await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+  }
+
+  async function getFlushState() {
+    var data = await chrome.storage.local.get(FLUSH_STATE_KEY);
+    var s = data[FLUSH_STATE_KEY];
+    return {
+      fails: Number((s && s.fails) || 0),
+      nextAt: Number((s && s.nextAt) || 0),
+      openUntil: Number((s && s.openUntil) || 0),
+    };
+  }
+  async function setFlushState(state) {
+    await chrome.storage.local.set({ [FLUSH_STATE_KEY]: state });
+  }
+
+  // Build the queued record. `_a` (attempts) is a top-level bookkeeping field
+  // that is never sent to PostHog (the batch mapper only reads
+  // event/properties/timestamp/distinct_id).
+  async function capture(event, props) {
+    props = props || {};
+    var id = await getOrCreateUserId();
+    var manifest = chrome.runtime.getManifest();
+    var record = {
+      event: event,
+      properties: {
+        ...props,
+        distinct_id: id,
+        $insert_id: newId(),
+        $lib: "chrome-extension",
+        extension_version: manifest.version,
+        browser_language: typeof navigator !== "undefined" ? navigator.language : undefined,
+      },
+      timestamp: new Date().toISOString(),
+    };
+    var queue = await getQueue();
+    queue.push(record);
+    if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+    await setQueue(queue);
+  }
+
+  // Best-effort enqueue for the resilience layer's own events. Never throws,
+  // and (crucially) only enqueues — it does NOT bypass the breaker with its own
+  // fetch, so it cannot create a second retry storm.
+  async function enqueueInternal(event, props) {
+    try {
+      await capture(event, props);
+    } catch (err) {
+      /* best-effort */
+    }
+  }
+
+  function toPosthog(rec) {
+    return {
+      event: rec.event,
+      properties: rec.properties,
+      timestamp: rec.timestamp,
+      distinct_id: rec.properties.distinct_id,
+    };
+  }
+
+  function classifyError(err) {
+    var msg = err && err.message ? String(err.message) : "";
+    if (/^PostHog returned/i.test(msg)) return "http_error";
+    if (/network|fetch|TypeError|Failed to fetch/i.test(msg)) return "network_error";
+    return "unknown";
+  }
+
+  function computeBackoff(fails, hardBlocked) {
+    if (hardBlocked) return BACKOFF_CAP_MS; // endpoint blocked — back off hard
+    var ms = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * Math.pow(2, Math.max(0, fails - 1)));
+    // Equal-jitter: half fixed + half random, to de-sync many clients.
+    var jittered = ms / 2 + Math.random() * (ms / 2);
+    return Math.max(BACKOFF_BASE_MS, Math.round(jittered));
+  }
+
+  /* ── flush ───────────────────────────────────────────────────────────── */
+
+  async function onFlushSuccess(sentCount) {
+    // Re-read the queue (capture may have appended while the POST was in
+    // flight) and drop the first `sentCount` events we just delivered. New
+    // events are only ever appended at the tail, so a head-slice is safe.
+    var queue = await getQueue();
+    await setQueue(queue.slice(sentCount));
+    await setFlushState({ fails: 0, nextAt: 0, openUntil: 0 });
+  }
+
+  async function onFlushFailure(err, status, batchLen) {
+    // 1. Per-event retry cap: bump attempts on the events we just tried (the
+    //    head of the queue) and drop any that have exhausted MAX_ATTEMPTS.
+    var queue = await getQueue();
+    for (var k = 0; k < batchLen && k < queue.length; k++) {
+      queue[k]._a = (queue[k]._a || 0) + 1;
+    }
+    var survivors = queue.filter((ev) => (ev._a || 0) < MAX_ATTEMPTS);
+    var dropped = queue.length - survivors.length;
+    await setQueue(survivors);
+
+    // 2. Backoff + circuit-breaker state.
+    var prev = await getFlushState();
+    var fails = prev.fails + 1;
+    var hardBlocked = status === 407 || status === 403;
+    var next = {
+      fails: fails,
+      nextAt: Date.now() + computeBackoff(fails, hardBlocked),
+      openUntil: prev.openUntil,
+    };
+    var openedNow = false;
+    if (fails >= CIRCUIT_THRESHOLD) {
+      next.openUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+      openedNow = fails === CIRCUIT_THRESHOLD; // emit once per failure episode
+    }
+    await setFlushState(next);
+
+    console.warn("[analytics] flush failed, backing off:", err && err.message, "fails=" + fails);
+
+    // 3. Aggregated drop count (count only, no PII).
+    if (dropped > 0) await enqueueInternal("analytics_events_dropped", { count: dropped });
+
+    // 4. Best-effort circuit-open notice (queued, respects the breaker).
+    if (openedNow) {
+      await enqueueInternal("analytics_circuit_opened", {
+        consecutive_failures: fails,
+        endpoint_status: typeof status === "number" ? status : null,
+        hard_blocked: hardBlocked,
+      });
+    }
+
+    // 5. One bounded failure report per attempt. Attempts are now rate-limited
+    //    by backoff/circuit, so this volume falls sharply versus the old
+    //    every-30s loop.
+    var cls = classifyError(err);
+    await enqueueInternal("analytics_flush_failed", {
+      status: cls,
+      error_class: cls,
+      endpoint_status: typeof status === "number" ? status : null,
+      batch_size: batchLen,
+    });
+  }
+
+  async function flush() {
+    var now = Date.now();
+    var state = await getFlushState();
+    // Circuit open → skip entirely until the cool-down elapses.
+    if (state.openUntil && now < state.openUntil) return;
+    // Inside a backoff window → skip this tick.
+    if (state.nextAt && now < state.nextAt) return;
+
+    var queue = await getQueue();
+    if (queue.length === 0) return;
+
+    var batch = queue.slice(0, BATCH_SIZE);
+    var payload = { api_key: API_KEY, batch: batch.map(toPosthog) };
+    var status = null;
+    try {
+      var resp = await fetch(`${HOST}/batch/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      });
+      if (!resp.ok) {
+        status = resp.status;
+        throw new Error(`PostHog returned ${resp.status}`);
+      }
+      await onFlushSuccess(batch.length);
+    } catch (err) {
+      await onFlushFailure(err, status, batch.length);
+    }
+  }
+
+  /* ── lifecycle ───────────────────────────────────────────────────────── */
+
+  function initAnalytics() {
+    chrome.alarms.create("analytics_flush", { periodInMinutes: 0.5 });
+    chrome.alarms.onAlarm.addListener((alarm) => {
+      if (alarm.name === "analytics_flush") flush();
+    });
+
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (!msg || typeof msg.type !== "string") return;
+      if (msg.type === "analytics:capture") {
+        capture(msg.event, msg.properties).then(() => sendResponse({ ok: true }));
+        return true;
+      }
+      if (msg.type === "analytics:getDistinctId") {
+        getDistinctId().then((v) => sendResponse({ value: v }));
+        return true;
+      }
+      if (msg.type === "analytics:flush") {
+        flush().then(() => sendResponse({ ok: true }));
+        return true;
+      }
+    });
+
+    chrome.runtime.onInstalled.addListener(async (details) => {
+      var version = chrome.runtime.getManifest().version;
+      if (details.reason === "install") {
+        await capture("extension_installed", { version: version });
+      } else if (details.reason === "update" && details.previousVersion && details.previousVersion !== version) {
+        await capture("extension_updated", {
+          from: details.previousVersion,
+          to: version,
+          previous_version: details.previousVersion,
+          version: version,
+        });
+      }
+      await setupUninstallTracking();
+      await flush();
+    });
+
+    chrome.runtime.onStartup.addListener(async () => {
+      await capture("extension_started", { version: chrome.runtime.getManifest().version });
+      await setupUninstallTracking();
+      await flush();
+    });
+  }
+
+  self.analytics = {
+    initAnalytics: initAnalytics,
+    capture: capture,
+    trackEvent: capture,
+    flush: flush,
+    getDistinctId: getDistinctId,
+    getOrCreateUserId: getOrCreateUserId,
+    setupUninstallTracking: setupUninstallTracking,
+  };
+})();
