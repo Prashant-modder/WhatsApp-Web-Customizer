@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "WhatsApp Web Customizer – Themes, Fonts, Backgrounds & Quick Reply Bubbles",
-  "version": "1.1.10",
+  "version": "1.1.13",
   "description": "Personalize WhatsApp Web with themes, fonts, backgrounds, and fast-reply tools. Lightweight, clean, and fully open source.",
-  "permissions": ["storage", "scripting", "clipboardRead", "alarms"],
+  "permissions": ["storage", "unlimitedStorage", "scripting", "clipboardRead", "alarms"],
   "optional_host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",
@@ -26,11 +26,12 @@
       "matches": ["https://web.whatsapp.com/"],
       "js": [
         "track.js",
-        "fontFamilyChange.js",
         "changeContent.js",
         "quick-reply-bubbles.js",
         "themes-presets.js",
         "themes-content.js",
+        "fonts-presets.js",
+        "fonts-content.js",
         "reviewPrompt.js",
         "water-bubbles.js",
         "gradient-mesh.js",

@@ -22,7 +22,6 @@
 
         <script src="track.js" defer></script>
         <script src="popup-nav.js" defer></script>
-        <script src="fontFamilyChange.js" defer></script>
         <script src="popup.js" defer></script>
         <script src="feature-toggles-popup.js" defer></script>
         <script src="fontSizeChange.js" defer></script>
@@ -30,6 +29,9 @@
         <script src="quick-replies.js" defer></script>
         <script src="themes-presets.js" defer></script>
         <script src="themes.js" defer></script>
+        <script src="save-nudge.js" defer></script>
+        <script src="fonts-presets.js" defer></script>
+        <script src="fonts.js" defer></script>
         <script src="animated-bg-popup.js" defer></script>
         <script src="animated-bg-hint.js" defer></script>
 
@@ -63,22 +65,28 @@
                 overflow: hidden;
             }
 
-            /* ---- Pill nav (vertical) ---- */
+            /* ---- Left nav (vertical) ----
+               Active state is a neutral, slightly-lighter background with a 3px
+               green left-border accent and white text — green appears only as a
+               thin indicator, never as a full pill fill. Inactive items are
+               muted with a subtle neutral hover. */
             .nav-pills .nav-link {
                 color: var(--wa-muted);
                 text-align: left;
-                border-radius: 8px;
-                padding: 8px 12px;
+                border-radius: 12px;
+                padding: 12px 12px;
                 font-size: 13px;
                 font-weight: 500;
+                border-left: 3px solid transparent;
             }
             .nav-pills .nav-link:hover {
                 color: var(--wa-text);
-                background: rgba(255, 255, 255, 0.04);
+                background: rgba(31, 44, 52, 0.5);
             }
             .nav-pills .nav-link.active {
-                background: var(--wa-accent);
+                background: #1f2c34;
                 color: #fff;
+                border-left: 3px solid #25d366;
             }
 
             /* ---- Form controls in dark theme ---- */
@@ -568,16 +576,6 @@
                 text-align: center;
             }
 
-            /* Font live preview block */
-            #font-preview {
-                background: var(--wa-bg);
-                border: 1px solid var(--wa-border);
-                border-radius: 6px;
-                padding: 10px 12px;
-                font-size: 16px;
-                color: var(--wa-text);
-            }
-
             /* Collapse helper for the Effects accordion */
             .collapse:not(.show) {
                 display: none;
@@ -640,6 +638,328 @@
                 background: var(--wa-surface-2);
                 color: var(--wa-muted);
             }
+
+            /* ── Font cards (reuse .theme-card; preview text in the swatch) ──
+               The font grid can grow long, so it scrolls inside a capped box
+               (.font-grid-scroll) which keeps the Font size control below it
+               reachable without scrolling the whole tab. */
+            .font-swatch {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            }
+            .font-sample {
+                font-size: 30px;
+                line-height: 1;
+                color: var(--wa-text);
+                white-space: nowrap;
+                padding: 0 8px;
+            }
+            .font-grid-scroll {
+                max-height: 280px;
+                overflow-y: auto;
+                overflow-x: hidden;
+                margin: 0 -2px 8px;
+                padding: 2px;
+            }
+
+            /* ════════════════════════════════════════════════════════════════
+               TYPOGRAPHY PANEL — design-system pass. Scoped to #tab-typography
+               so the other tabs (which reuse .theme-card / .bg-subtab / Bootstrap
+               buttons) are untouched. WhatsApp-green (#25D366) is a SCARCE accent:
+               the single primary "Create" button, the active segment underline,
+               and the selected-card border (plus the nav indicator above). All
+               spacing uses an 8px scale (8 / 16 / 24 / 32).
+               ──────────────────────────────────────────────────────────────── */
+            #tab-typography {
+                --ts-card: #1f2c34;
+                --ts-border: #2a3942;
+                --ts-field: #0b141a;
+                --ts-text: #e9edef;
+                --ts-muted: #8696a0;
+                --ts-accent: #25d366;
+                --ts-accent-hover: #1fbf5b;
+            }
+
+            /* Section labels — "FONT FAMILY" / "FONT SIZE" */
+            #tab-typography .section-label {
+                font-size: 12px;
+                font-weight: 600;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: var(--ts-muted);
+            }
+
+            /* Header: label left, action group right, on the same baseline */
+            #tab-typography .ts-header {
+                margin-bottom: 8px;
+            }
+            #tab-typography .ts-hint {
+                font-size: 13px;
+                font-weight: 400;
+                color: var(--ts-muted);
+                margin: 0 0 24px;
+            }
+
+            /* Button hierarchy — exactly three styles, all 32px tall, 8px gap */
+            #tab-typography .ts-actions {
+                gap: 8px;
+            }
+            #tab-typography .ts-actions .btn,
+            #tab-typography .ts-size-row .btn {
+                height: 32px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                padding: 0 14px;
+                font-size: 13px;
+                font-weight: 600;
+                border-radius: 12px;
+                border: 1px solid transparent;
+                box-shadow: none;
+                transition: background 0.15s ease, border-color 0.15s ease,
+                    color 0.15s ease;
+            }
+            #tab-typography .ts-actions .btn:focus-visible,
+            #tab-typography .ts-size-row .btn:focus-visible {
+                outline: 2px solid var(--ts-accent);
+                outline-offset: 2px;
+            }
+            /* Primary — solid green. ONLY "Create". */
+            #tab-typography #create-font {
+                background: var(--ts-accent);
+                border-color: var(--ts-accent);
+                color: #fff;
+            }
+            #tab-typography #create-font:hover {
+                background: var(--ts-accent-hover);
+                border-color: var(--ts-accent-hover);
+                color: #fff;
+            }
+            /* Secondary — transparent, bordered, light-grey text. "Manage Fonts"
+               and the quieter custom-pane add buttons. */
+            #tab-typography #open-font-manager,
+            #tab-typography #font-customs-new,
+            #tab-typography #font-customs-create {
+                background: transparent;
+                border-color: var(--ts-border);
+                color: var(--ts-text);
+            }
+            #tab-typography #open-font-manager:hover,
+            #tab-typography #font-customs-new:hover,
+            #tab-typography #font-customs-create:hover {
+                background: rgba(42, 57, 66, 0.4);
+                border-color: #3a4b55;
+                color: #fff;
+            }
+            /* Custom-pane add buttons live outside .ts-actions — give them the
+               same 32px height / 12px radius so all controls stay consistent. */
+            #tab-typography #font-customs-new,
+            #tab-typography #font-customs-create {
+                height: 32px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                border-radius: 12px;
+                font-size: 13px;
+                font-weight: 600;
+                box-shadow: none;
+            }
+            /* Tertiary / ghost — the quietest element. "Reset" (family + size). */
+            #tab-typography #reset-font,
+            #tab-typography #reset-scale {
+                background: transparent;
+                border-color: transparent;
+                color: var(--ts-muted);
+                padding: 0 10px;
+            }
+            #tab-typography #reset-font:hover,
+            #tab-typography #reset-scale:hover {
+                background: rgba(31, 44, 52, 0.5);
+                color: var(--ts-text);
+            }
+
+            /* Presets / Custom — segmented control (no saturated green fill) */
+            #tab-typography .bg-subtabs {
+                background: var(--ts-card);
+                border: 1px solid var(--ts-border);
+                border-radius: 12px;
+                padding: 4px;
+                gap: 4px;
+                margin-bottom: 24px;
+            }
+            #tab-typography .bg-subtab {
+                position: relative;
+                flex: 1;
+                background: transparent;
+                color: var(--ts-muted);
+                border: none;
+                border-radius: 8px;
+                padding: 8px 10px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            #tab-typography .bg-subtab:hover {
+                color: var(--ts-text);
+            }
+            #tab-typography .bg-subtab.active {
+                background: var(--ts-border);
+                color: #fff;
+            }
+            #tab-typography .bg-subtab.active::after {
+                content: "";
+                position: absolute;
+                left: 12px;
+                right: 12px;
+                bottom: 4px;
+                height: 2px;
+                border-radius: 2px;
+                background: var(--ts-accent);
+            }
+
+            /* Font preview cards */
+            #tab-typography .font-grid-scroll {
+                margin: 0 0 24px;
+            }
+            #tab-typography .theme-card {
+                background: var(--ts-card);
+                border: 1px solid var(--ts-border);
+                border-radius: 12px;
+                padding: 16px;
+                transition: border-color 0.15s ease, transform 0.15s ease,
+                    box-shadow 0.15s ease;
+            }
+            #tab-typography .theme-card:hover,
+            #tab-typography .theme-card:focus-visible {
+                border-color: rgba(37, 211, 102, 0.4);
+                transform: translateY(-2px);
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+            }
+            #tab-typography .theme-card.active {
+                border-color: var(--ts-accent);
+                box-shadow: none;
+            }
+            /* Drop the boxy green "ACTIVE" chip — selection = green border. */
+            #tab-typography .theme-card.active::after {
+                display: none;
+            }
+            #tab-typography .theme-swatch {
+                width: auto;
+                aspect-ratio: auto;
+                background: transparent;
+                margin-bottom: 8px;
+            }
+            #tab-typography .font-sample {
+                font-size: 34px;
+                color: var(--ts-text);
+            }
+            #tab-typography .theme-label {
+                padding: 0;
+                margin-bottom: 4px;
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--ts-text);
+            }
+            /* Small muted uppercase label — no background box */
+            #tab-typography .theme-tag {
+                margin: 0;
+                padding: 0;
+                background: transparent;
+                border-radius: 0;
+                font-size: 10px;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: var(--ts-muted);
+            }
+
+            /* Custom-pane empty state — match the card surface */
+            #tab-typography .theme-empty {
+                background: var(--ts-card);
+                border: 1px solid var(--ts-border);
+                border-radius: 12px;
+                padding: 24px 16px;
+            }
+            #tab-typography .theme-empty-headline {
+                color: var(--ts-text);
+            }
+            #tab-typography .theme-empty-sub {
+                color: var(--ts-muted);
+            }
+
+            /* Font size — its own distinct block matching the card section */
+            #tab-typography .ts-size-block {
+                background: var(--ts-card);
+                border: 1px solid var(--ts-border);
+                border-radius: 12px;
+                padding: 16px;
+            }
+            #tab-typography .ts-size-row {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                margin-top: 8px;
+            }
+            #tab-typography .ts-size-row .form-range {
+                flex: 1;
+                margin: 0;
+            }
+            #tab-typography .ts-size-row .form-range::-webkit-slider-thumb {
+                background: var(--ts-accent);
+            }
+            #tab-typography .ts-size-row .form-range::-moz-range-thumb {
+                background: var(--ts-accent);
+            }
+            #tab-typography #scale-percent-input {
+                width: 72px;
+                height: 32px;
+                border-radius: 12px;
+                background: var(--ts-field);
+                border: 1px solid var(--ts-border);
+                color: var(--ts-text);
+            }
+            #tab-typography .ts-size-row .text-secondary {
+                color: var(--ts-muted) !important;
+            }
+
+            /* ---- Save-this-theme nudge (Task 1: anti-reset activation) ---- */
+            .save-nudge {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin: 0 0 14px;
+                padding: 10px 12px;
+                background: var(--wa-surface);
+                border: 1px solid var(--wa-accent);
+                border-radius: 10px;
+                box-shadow: var(--wa-glow);
+            }
+            .save-nudge[hidden] { display: none; }
+            .save-nudge .save-nudge-text {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                font-size: 12px;
+                line-height: 1.35;
+                color: var(--wa-text);
+            }
+            .save-nudge .save-nudge-text strong { color: var(--wa-accent-hover); }
+            .save-nudge .save-nudge-text span { color: var(--wa-muted); }
+            .save-nudge .save-nudge-actions {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                flex-shrink: 0;
+            }
+            .save-nudge .save-nudge-actions .btn-link {
+                color: var(--wa-muted);
+                text-decoration: none;
+                padding: 4px 6px;
+            }
+            .save-nudge .save-nudge-actions .btn-link:hover { color: var(--wa-text); }
         </style>
     </head>
 
@@ -1008,6 +1328,25 @@
                             or <strong>Reset</strong> to revert to WhatsApp's default.
                         </p>
 
+                        <!-- Anti-reset "save your look" nudge. Hidden by default;
+                             revealed by save-nudge.js after the user has applied 3+
+                             themes in a session without ever saving one. Self-suppresses
+                             (≤1/session, ≤3 lifetime, never after a save). -->
+                        <div id="save-nudge" class="save-nudge" role="status" aria-live="polite" hidden>
+                            <div class="save-nudge-text">
+                                <strong id="save-nudge-title">Found a look you like?</strong>
+                                <span id="save-nudge-msg">Save it as a custom theme so it's one tap away next time.</span>
+                            </div>
+                            <div class="save-nudge-actions">
+                                <button id="save-nudge-save" type="button" class="btn btn-sm btn-success">
+                                    Save this theme
+                                </button>
+                                <button id="save-nudge-dismiss" type="button" class="btn btn-sm btn-link" aria-label="Dismiss">
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Sub-tab toggle: Presets vs Custom. Mirrors the Backgrounds
                              tab pattern (same .bg-subtabs/.bg-subtab classes) so the
                              two surfaces feel identical. JS in themes.js. -->
@@ -1071,74 +1410,126 @@
 
                     <!-- ─────── TYPOGRAPHY ─────── -->
                     <section class="tab-pane fade" id="tab-typography">
-                        <h2 class="section-label mb-2">Font family</h2>
-                        <select id="fontSelector" class="form-select form-select-sm mb-2">
-                            <option value="">Nothing</option>
-                            <option value="Pacifico">Pacifico</option>
-                            <option value="Lobster">Lobster</option>
-                            <option value="Dancing+Script">Dancing Script</option>
-                            <option value="Roboto">Roboto</option>
-                            <option value="Open+Sans">Open Sans</option>
-                            <option value="Montserrat">Montserrat</option>
-                            <option value="Press+Start+2P">Press Start 2P</option>
-                            <option value="Indie+Flower">Indie Flower</option>
-                            <option value="Oswald">Oswald</option>
-                            <option value="Raleway">Raleway</option>
-                            <option value="Lora">Lora</option>
-                            <option value="Merriweather">Merriweather</option>
-                            <option value="PT+Sans">PT Sans</option>
-                            <option value="PT+Serif">PT Serif</option>
-                            <option value="Playfair+Display">Playfair Display</option>
-                            <option value="Quicksand">Quicksand</option>
-                            <option value="Ubuntu">Ubuntu</option>
-                            <option value="Fira+Sans">Fira Sans</option>
-                            <option value="Noto+Sans">Noto Sans</option>
-                            <option value="Raleway+Dots">Raleway Dots</option>
-                            <option value="Bebas+Neue">Bebas Neue</option>
-                            <option value="Arvo">Arvo</option>
-                            <option value="Cabin">Cabin</option>
-                            <option value="Amatic+SC">Amatic SC</option>
-                            <option value="Caveat">Caveat</option>
-                            <option value="Satisfy">Satisfy</option>
-                            <option value="Patua+One">Patua One</option>
-                            <option value="Fredoka+One">Fredoka One</option>
-                            <option value="Shadows+Into+Light">Shadows Into Light</option>
-                            <option value="Kalam">Kalam</option>
-                            <option value="Indie+Flower">Indie Flower</option>
-                        </select>
-                        <div id="font-preview" class="mb-4">
-                            The quick brown fox jumps over the lazy dog
+                        <!-- Toolbar: header + actions, mirroring the Themes tab so the
+                             two surfaces feel identical. Create / Manage Fonts / Reset
+                             stay above the fold; JS lives in fonts.js. -->
+                        <div class="ts-header d-flex align-items-center justify-content-between">
+                            <h2 class="section-label m-0">Font family</h2>
+                            <div class="ts-actions d-flex align-items-center">
+                                <button id="create-font" type="button" class="btn btn-sm btn-success">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2.5"
+                                        stroke-linecap="round" stroke-linejoin="round"
+                                        style="margin-right:4px;vertical-align:-1px;">
+                                        <line x1="12" y1="5" x2="12" y2="19" />
+                                        <line x1="5" y1="12" x2="19" y2="12" />
+                                    </svg>
+                                    Create
+                                </button>
+                                <button id="open-font-manager" type="button" class="btn btn-sm btn-outline-success">
+                                    Manage Fonts
+                                </button>
+                                <button id="reset-font" type="button" class="btn btn-sm btn-outline-secondary">
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                        <p class="ts-hint">
+                            Click any font below to apply it instantly. Use Manage Fonts to
+                            upload your own or load one from a URL, or Reset to revert to
+                            WhatsApp's default.
+                        </p>
+
+                        <!-- Presets vs Custom — same .bg-subtabs/.bg-subtab pattern as Themes. -->
+                        <div class="bg-subtabs d-flex mb-3" role="tablist">
+                            <button
+                                type="button"
+                                class="bg-subtab active"
+                                data-fonts-subtab="fonts-presets"
+                                role="tab"
+                                aria-selected="true"
+                                aria-controls="fonts-presets"
+                            >Presets</button>
+                            <button
+                                type="button"
+                                class="bg-subtab"
+                                data-fonts-subtab="fonts-customs"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="fonts-customs"
+                            >Custom</button>
                         </div>
 
-                        <h2 class="section-label mb-2">Font size</h2>
-                        <input
-                            type="range"
-                            id="font-scale-slider"
-                            class="form-range mb-2"
-                            min="0.5"
-                            max="1.5"
-                            step="0.05"
-                            value="1"
-                        />
-                        <div class="d-flex align-items-center gap-2">
-                            <input
-                                type="number"
-                                id="scale-percent-input"
-                                class="form-control form-control-sm"
-                                min="50"
-                                max="150"
-                                step="1"
-                                value="100"
-                                style="width: 84px"
-                            />
-                            <span class="text-secondary small">%</span>
-                            <button
-                                id="reset-scale"
-                                type="button"
-                                class="btn btn-sm btn-outline-secondary ms-auto"
-                            >
-                                Reset
-                            </button>
+                        <!-- Capped, internally-scrolling grid: however many fonts the
+                             user adds, the Font size control below stays reachable
+                             without scrolling the whole tab. -->
+                        <div class="font-grid-scroll">
+                            <div class="bg-subpane" id="fonts-presets" role="tabpanel">
+                                <div class="row g-2" id="font-presets-grid"></div>
+                            </div>
+
+                            <div class="bg-subpane" id="fonts-customs" role="tabpanel" hidden>
+                                <button
+                                    id="font-customs-new"
+                                    type="button"
+                                    class="btn btn-sm btn-success w-100 mb-2"
+                                    style="display: none"
+                                >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2.5"
+                                        stroke-linecap="round" stroke-linejoin="round"
+                                        style="margin-right:4px;vertical-align:-1px;">
+                                        <line x1="12" y1="5" x2="12" y2="19" />
+                                        <line x1="5" y1="12" x2="19" y2="12" />
+                                    </svg>
+                                    New font
+                                </button>
+
+                                <div class="row g-2" id="font-customs-grid"></div>
+
+                                <div id="font-customs-empty" class="theme-empty" style="display: none">
+                                    <div class="theme-empty-headline">No custom fonts yet</div>
+                                    <p class="theme-empty-sub">
+                                        Upload a font, load one from a URL, or create one
+                                        from a Google Font.
+                                    </p>
+                                    <button id="font-customs-create" type="button" class="btn btn-sm btn-success">
+                                        Add your first font
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ts-size-block">
+                            <h2 class="section-label">Font size</h2>
+                            <div class="ts-size-row">
+                                <input
+                                    type="range"
+                                    id="font-scale-slider"
+                                    class="form-range"
+                                    min="0.5"
+                                    max="1.5"
+                                    step="0.05"
+                                    value="1"
+                                />
+                                <input
+                                    type="number"
+                                    id="scale-percent-input"
+                                    class="form-control form-control-sm"
+                                    min="50"
+                                    max="150"
+                                    step="1"
+                                    value="100"
+                                />
+                                <span class="text-secondary small">%</span>
+                                <button
+                                    id="reset-scale"
+                                    type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                >
+                                    Reset
+                                </button>
+                            </div>
                         </div>
                     </section>
 

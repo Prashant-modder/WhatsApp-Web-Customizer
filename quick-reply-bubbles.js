@@ -1,1 +1,181 @@
-const bubbleStyles="\n  #quick-reply-bubbles {\n    display: flex;\n    flex-wrap: wrap;\n    gap: 10px;\n    margin: 12px 10px;\n    padding: 8px 12px;\n    justify-content: flex-start;\n    z-index: 100;\n  }\n\n  .quick-reply-bubble {\n    background: linear-gradient(135deg, #ffffff, #f0f0f5);\n    color: #333;\n    border-radius: 20px;\n    padding: 10px 16px;\n    cursor: pointer;\n    font-size: 14px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n    white-space: nowrap;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\n    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;\n    animation: bubbleAppear 0.4s ease-out forwards;\n  }\n\n  @keyframes bubbleAppear {\n    0% {\n      opacity: 0;\n      transform: translateY(10px);\n    }\n    100% {\n      opacity: 1;\n      transform: translateY(0);\n    }\n  }\n\n  .quick-reply-bubble:hover {\n    background: linear-gradient(135deg, #e0f7fa, #b2ebf2);\n    transform: translateY(-2px) scale(1.05);\n    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);\n  }\n\n  .quick-reply-bubble:active {\n    animation: bubbleClick 0.2s ease;\n  }\n\n  @keyframes bubbleClick {\n    0% {\n      transform: scale(1);\n    }\n    50% {\n      transform: scale(0.95);\n    }\n    100% {\n      transform: scale(1);\n    }\n  }\n";let sessionBubblesShownCount=0,sessionBubblesInsertedCount=0,sessionEventFired=!1;function fireBubblesSessionSummary(){if(!sessionEventFired&&0!==sessionBubblesShownCount){sessionEventFired=!0;try{window.track&&window.track("quick_reply_bubbles_session",{bubbles_shown_count:sessionBubblesShownCount,bubbles_inserted_count:sessionBubblesInsertedCount})}catch(e){}}}window.addEventListener("pagehide",fireBubblesSessionSummary);const BUBBLES_SHOWN_THROTTLE_MS=1e4;let lastBubblesShownAt=0;function buildBubbles(e,n,t){const s=[...n].sort(()=>.5-Math.random()),r=s.slice(0,Math.min(5,s.length)),o=r.length;sessionBubblesShownCount+=o;try{const e=Date.now();window.track&&e-lastBubblesShownAt>=1e4&&(lastBubblesShownAt=e,window.track("quick_reply_bubbles_shown",{count:o,qr_count_total:n.length}))}catch(e){}r.forEach((n,s)=>{const r=document.createElement("span");r.textContent=n,r.className="quick-reply-bubble",r.style.animationDelay=.1*s+"s",r.addEventListener("click",()=>{const e=t.querySelector("div[contenteditable='true']");e&&(e.focus(),document.execCommand("insertText",!1,n)),sessionBubblesInsertedCount++;try{window.track&&window.track("quick_reply_inserted",{bubble_position:s,bubbles_shown:o})}catch(e){}}),e.appendChild(r)})}let qrInsertInFlight=!1;function insertQuickReplyBubbles(){if(qrInsertInFlight)return;document.querySelector("footer")&&!document.getElementById("quick-reply-bubbles")&&(qrInsertInFlight=!0,chrome.storage.local.get(["quickReplies"],e=>{try{const n=document.querySelector("footer");if(!n||document.getElementById("quick-reply-bubbles"))return;const t=Array.isArray(e.quickReplies)?e.quickReplies:[];if(0===t.length)return;if(!document.getElementById("qr-bubble-styles")){const e=document.createElement("style");e.id="qr-bubble-styles",e.textContent=bubbleStyles,document.head.appendChild(e)}const s=document.createElement("div");s.id="quick-reply-bubbles",n.insertBefore(s,n.firstChild),buildBubbles(s,t,n)}finally{qrInsertInFlight=!1}}))}function observeDOMForQuickReplies(){new MutationObserver(()=>{const e=document.querySelector("footer"),n=document.getElementById("quick-reply-bubbles");e&&!n&&insertQuickReplyBubbles()}).observe(document.body,{childList:!0,subtree:!0})}chrome.storage.onChanged.addListener((e,n)=>{if("local"!==n||!e.quickReplies)return;const t=Array.isArray(e.quickReplies.newValue)?e.quickReplies.newValue:[],s=document.getElementById("quick-reply-bubbles");if(0===t.length)return void(s&&s.remove());const r=document.querySelector("footer");r&&(s?(s.innerHTML="",buildBubbles(s,t,r)):insertQuickReplyBubbles())}),observeDOMForQuickReplies();
+/* quick-reply-bubbles.js  (Task 4 — debounce render loop & fix shown over-fire)
+ *
+ * Data point driving this: quick_reply_bubbles_shown was 9,057 of 37,172 total
+ * events (24%) from only 32 users — one user fired it 2,707 times (vs 727
+ * inserts). The old code ran a MutationObserver on document.body {subtree:true}
+ * and re-built bubbles (and re-emitted the event, throttled) on WhatsApp's hot
+ * mutation path, poisoning every metric and plausibly causing the "extension
+ * makes WhatsApp laggy" churn.
+ *
+ * Fix:
+ *   - Observer work per mutation is now just scheduling a debounced reconcile
+ *     (a single early-returning timer check); the real work runs at most once
+ *     per DEBOUNCE_MS.
+ *   - quick_reply_bubbles_shown fires once per visibility transition (bubbles
+ *     become visible == a chat opened), not per mutation. Settings-driven
+ *     rebuilds do NOT emit it.
+ *   - The observer is scoped to the stable #app root rather than document.body.
+ */
+const bubbleStyles =
+  "\n  #quick-reply-bubbles {\n    display: flex;\n    flex-wrap: wrap;\n    gap: 10px;\n    margin: 12px 10px;\n    padding: 8px 12px;\n    justify-content: flex-start;\n    z-index: 100;\n  }\n\n  .quick-reply-bubble {\n    background: linear-gradient(135deg, #ffffff, #f0f0f5);\n    color: #333;\n    border-radius: 20px;\n    padding: 10px 16px;\n    cursor: pointer;\n    font-size: 14px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n    white-space: nowrap;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\n    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;\n    animation: bubbleAppear 0.4s ease-out forwards;\n  }\n\n  @keyframes bubbleAppear {\n    0% {\n      opacity: 0;\n      transform: translateY(10px);\n    }\n    100% {\n      opacity: 1;\n      transform: translateY(0);\n    }\n  }\n\n  .quick-reply-bubble:hover {\n    background: linear-gradient(135deg, #e0f7fa, #b2ebf2);\n    transform: translateY(-2px) scale(1.05);\n    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);\n  }\n\n  .quick-reply-bubble:active {\n    animation: bubbleClick 0.2s ease;\n  }\n\n  @keyframes bubbleClick {\n    0% {\n      transform: scale(1);\n    }\n    50% {\n      transform: scale(0.95);\n    }\n    100% {\n      transform: scale(1);\n    }\n  }\n";
+
+let sessionBubblesShownCount = 0;
+let sessionBubblesInsertedCount = 0;
+let sessionEventFired = false;
+
+function track(name, props) {
+  try {
+    if (window.track) window.track(name, props || {});
+  } catch (e) {
+    /* analytics best-effort */
+  }
+}
+
+function fireBubblesSessionSummary() {
+  if (sessionEventFired || sessionBubblesShownCount === 0) return;
+  sessionEventFired = true;
+  track("quick_reply_bubbles_session", {
+    bubbles_shown_count: sessionBubblesShownCount,
+    bubbles_inserted_count: sessionBubblesInsertedCount,
+  });
+}
+window.addEventListener("pagehide", fireBubblesSessionSummary);
+
+function ensureStyles() {
+  if (document.getElementById("qr-bubble-styles")) return;
+  const style = document.createElement("style");
+  style.id = "qr-bubble-styles";
+  style.textContent = bubbleStyles;
+  document.head.appendChild(style);
+}
+
+// Build the bubble DOM into `container`. Pure rendering: this does NOT emit
+// quick_reply_bubbles_shown (the visibility-transition emit lives in
+// insertQuickReplyBubbles), so settings-driven rebuilds don't inflate it.
+function buildBubbles(container, replies, footer) {
+  const picked = [...replies]
+    .sort(() => 0.5 - Math.random())
+    .slice(0, Math.min(5, replies.length));
+  const shownCount = picked.length;
+  sessionBubblesShownCount += shownCount;
+
+  picked.forEach((text, idx) => {
+    const span = document.createElement("span");
+    span.textContent = text;
+    span.className = "quick-reply-bubble";
+    span.style.animationDelay = 0.1 * idx + "s";
+    span.addEventListener("click", () => {
+      const ed = footer.querySelector("div[contenteditable='true']");
+      if (ed) {
+        ed.focus();
+        document.execCommand("insertText", false, text);
+      }
+      sessionBubblesInsertedCount++;
+      track("quick_reply_inserted", { bubble_position: idx, bubbles_shown: shownCount });
+    });
+    container.appendChild(span);
+  });
+  return shownCount;
+}
+
+let bubblesVisible = false;
+let qrInsertInFlight = false;
+
+// Insert bubbles for the currently-open chat and emit one shown event for this
+// visibility transition. Guarded so concurrent reconciles can't double-insert.
+function insertQuickReplyBubbles() {
+  if (qrInsertInFlight) return;
+  const footer = document.querySelector("footer");
+  if (!footer || document.getElementById("quick-reply-bubbles")) return;
+
+  qrInsertInFlight = true;
+  chrome.storage.local.get(["quickReplies"], (data) => {
+    try {
+      const target = document.querySelector("footer");
+      if (!target || document.getElementById("quick-reply-bubbles")) return;
+      const replies = Array.isArray(data.quickReplies) ? data.quickReplies : [];
+      if (replies.length === 0) return;
+
+      ensureStyles();
+      const container = document.createElement("div");
+      container.id = "quick-reply-bubbles";
+      target.insertBefore(container, target.firstChild);
+      const shownCount = buildBubbles(container, replies, target);
+
+      // Visibility transition (not visible -> visible) == bubbles shown for a
+      // freshly opened chat. Emit exactly once per transition.
+      bubblesVisible = true;
+      track("quick_reply_bubbles_shown", {
+        count: shownCount,
+        qr_count_total: replies.length,
+      });
+    } finally {
+      qrInsertInFlight = false;
+    }
+  });
+}
+
+// Coalesce WhatsApp's mutation storm: each mutation only (maybe) arms a single
+// timer; the actual reconcile runs at most once per DEBOUNCE_MS.
+const DEBOUNCE_MS = 250;
+let reconcileTimer = null;
+
+function reconcile() {
+  const footer = document.querySelector("footer");
+  const existing = document.getElementById("quick-reply-bubbles");
+  if (!footer) {
+    // Chat closed; any leftover bubbles belong to the old footer. Reset the
+    // visibility flag so re-opening a chat counts as a new show.
+    if (existing) existing.remove();
+    bubblesVisible = false;
+    return;
+  }
+  if (existing) return; // already shown for this chat — nothing to do
+  insertQuickReplyBubbles();
+}
+
+function scheduleReconcile() {
+  if (reconcileTimer) return;
+  reconcileTimer = setTimeout(() => {
+    reconcileTimer = null;
+    reconcile();
+  }, DEBOUNCE_MS);
+}
+
+function observeDOMForQuickReplies() {
+  // Scope to the stable app root rather than document.body. subtree is still
+  // needed to see the footer mount deep in the tree, but per-mutation work is
+  // now just scheduleReconcile()'s early-return check.
+  const target = document.getElementById("app") || document.body;
+  new MutationObserver(scheduleReconcile).observe(target, {
+    childList: true,
+    subtree: true,
+  });
+  scheduleReconcile();
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.quickReplies) return;
+  const replies = Array.isArray(changes.quickReplies.newValue)
+    ? changes.quickReplies.newValue
+    : [];
+  const existing = document.getElementById("quick-reply-bubbles");
+  if (replies.length === 0) {
+    if (existing) existing.remove();
+    bubblesVisible = false;
+    return;
+  }
+  const footer = document.querySelector("footer");
+  if (!footer) return;
+  if (existing) {
+    // Live settings edit: rebuild contents WITHOUT emitting a shown event.
+    existing.innerHTML = "";
+    buildBubbles(existing, replies, footer);
+  } else {
+    // Quick replies added while a chat is open — let reconcile insert + count
+    // it as a show.
+    scheduleReconcile();
+  }
+});
+
+observeDOMForQuickReplies();

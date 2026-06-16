@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>WhatsApp Customizer – Font Manager</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg-color: #1a1b26;
+                --text-color: #e0e0e0;
+                --muted-color: #a0a0a0;
+                --accent-color: #10b981;
+                --accent-hover: #34d399;
+                --danger-color: #dc2626;
+                --danger-hover: #ef4444;
+                --border-color: #2d2e3b;
+                --card-bg: #242530;
+                --card-bg-elevated: #2d2e3b;
+                --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                --glow: 0 0 8px rgba(16, 185, 129, 0.3);
+            }
+
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+
+            body {
+                font-family: "Inter", sans-serif;
+                background-color: var(--bg-color);
+                color: var(--text-color);
+                min-height: 100vh;
+                padding: 24px;
+            }
+
+            .page { max-width: 1200px; margin: 0 auto; }
+
+            header.page-header {
+                display: flex; align-items: center; justify-content: space-between;
+                margin-bottom: 24px; padding-bottom: 16px;
+                border-bottom: 1px solid var(--border-color);
+            }
+            header.page-header h1 { font-size: 22px; font-weight: 600; }
+            header.page-header .subtitle { color: var(--muted-color); font-size: 13px; margin-top: 4px; }
+            .header-actions { display: flex; gap: 8px; }
+
+            .panels {
+                display: grid; grid-template-columns: 1fr 1fr;
+                gap: 16px; margin-bottom: 24px;
+            }
+            @media (max-width: 780px) { .panels { grid-template-columns: 1fr; } }
+
+            .panel {
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 10px; padding: 18px;
+            }
+            .panel h2 {
+                font-size: 13px; font-weight: 600; text-transform: uppercase;
+                letter-spacing: 0.6px; color: var(--muted-color); margin-bottom: 12px;
+            }
+
+            .drop-zone {
+                border: 2px dashed var(--border-color);
+                border-radius: 8px; padding: 28px 16px; text-align: center;
+                cursor: pointer; color: var(--muted-color); font-size: 14px;
+                transition: border-color 0.2s ease, background 0.2s ease;
+            }
+            .drop-zone:hover, .drop-zone.dragover {
+                border-color: var(--accent-color);
+                background: rgba(16, 185, 129, 0.06);
+                color: var(--text-color);
+            }
+            .drop-zone strong { color: var(--accent-color); }
+            .drop-hint { margin-top: 8px; font-size: 12px; color: var(--muted-color); }
+
+            .url-row { display: flex; gap: 8px; }
+            .url-row input[type="url"], .url-row input[type="text"] {
+                flex: 1; background: var(--bg-color);
+                border: 1px solid var(--border-color); border-radius: 6px;
+                color: var(--text-color); font-size: 14px; padding: 10px 12px;
+                outline: none; transition: border-color 0.2s;
+            }
+            .url-row input:focus { border-color: var(--accent-color); }
+            .url-row input[type="url"].invalid { border-color: var(--danger-color); }
+            .url-name { max-width: 200px; }
+
+            button.primary, button.secondary {
+                padding: 10px 16px; border: none; border-radius: 6px;
+                font-size: 14px; font-weight: 500; cursor: pointer;
+                white-space: nowrap;
+                transition: background 0.2s ease, box-shadow 0.2s ease;
+            }
+            button.primary { background: var(--accent-color); color: #fff; }
+            button.primary:hover:not(:disabled) {
+                background: var(--accent-hover); box-shadow: var(--glow);
+            }
+            button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+            button.secondary {
+                background: var(--card-bg-elevated);
+                color: var(--text-color);
+                border: 1px solid var(--border-color);
+            }
+            button.secondary:hover { border-color: var(--accent-color); }
+
+            .status-line { margin-top: 10px; font-size: 13px; min-height: 18px; }
+            .status-line.info { color: var(--muted-color); }
+            .status-line.success { color: var(--accent-color); }
+            .status-line.error { color: var(--danger-hover); }
+
+            .library {
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 10px; padding: 18px; margin-bottom: 24px;
+            }
+            .library-header {
+                display: flex; align-items: center; justify-content: space-between;
+                flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+            }
+            .library-header h2 {
+                font-size: 13px; font-weight: 600; text-transform: uppercase;
+                letter-spacing: 0.6px; color: var(--muted-color);
+            }
+            .library-count { font-size: 12px; color: var(--muted-color); }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: 12px;
+            }
+
+            .theme-card {
+                position: relative;
+                background: var(--card-bg-elevated);
+                border: 2px solid var(--border-color);
+                border-radius: 10px; overflow: hidden;
+                transition: border-color 0.2s ease, box-shadow 0.2s ease;
+                cursor: pointer;
+            }
+            .theme-card:hover { border-color: var(--accent-color); box-shadow: var(--glow); }
+            .theme-card.active { border-color: var(--accent-color); box-shadow: var(--glow); }
+            .theme-card .swatch {
+                aspect-ratio: 16 / 9;
+                background: #222;
+                display: flex; align-items: center; justify-content: center;
+                overflow: hidden;
+            }
+            /* Font preview text rendered inside the card swatch. */
+            .theme-card .font-sample {
+                font-size: 30px; line-height: 1; color: var(--text-color);
+                white-space: nowrap; padding: 0 10px;
+            }
+            .theme-card .meta {
+                padding: 10px 12px;
+                display: flex; align-items: center; justify-content: space-between;
+                gap: 8px;
+            }
+            .theme-card .meta-name {
+                font-weight: 600; font-size: 14px;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            }
+            .theme-card .meta-author { font-size: 11px; color: var(--muted-color); margin-top: 2px; }
+            .theme-card .badge {
+                font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+                padding: 2px 6px; border-radius: 4px;
+                background: rgba(0,0,0,0.5); color: #fff;
+            }
+            .theme-card .badge.preset { background: rgba(16,185,129,0.8); }
+            .theme-card .badge.custom { background: rgba(59,130,246,0.8); }
+            .theme-card .actions {
+                position: absolute; top: 8px; right: 8px;
+                display: flex; gap: 4px;
+                opacity: 0; transition: opacity 0.2s ease;
+            }
+            .theme-card:hover .actions { opacity: 1; }
+            .theme-card .actions button {
+                width: 28px; height: 28px;
+                display: flex; align-items: center; justify-content: center;
+                border: none; border-radius: 50%;
+                background: rgba(0,0,0,0.7); color: #fff;
+                font-size: 14px; cursor: pointer;
+                transition: background 0.2s ease, transform 0.2s ease;
+            }
+            .theme-card .actions button:hover { transform: scale(1.1); }
+            .theme-card .actions button.delete:hover { background: var(--danger-color); }
+            .theme-card .actions button.export:hover { background: var(--accent-color); }
+            .theme-card .actions button.edit:hover { background: var(--accent-color); }
+            .theme-card .actions button.dup:hover  { background: var(--accent-color); }
+            .theme-card.active::after {
+                content: "ACTIVE";
+                position: absolute; bottom: 8px; right: 8px;
+                font-size: 9px; font-weight: 700; letter-spacing: 1px;
+                padding: 3px 7px; border-radius: 4px;
+                background: var(--accent-color); color: #fff;
+            }
+
+            .toast {
+                position: fixed; bottom: 24px; left: 50%;
+                transform: translateX(-50%) translateY(20px);
+                background: var(--card-bg-elevated);
+                color: var(--text-color);
+                padding: 12px 18px; border-radius: 8px;
+                border: 1px solid var(--border-color);
+                box-shadow: var(--shadow); font-size: 14px;
+                opacity: 0; pointer-events: none;
+                transition: opacity 0.25s ease, transform 0.25s ease;
+                z-index: 100;
+            }
+            .toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+            .toast.success { border-color: var(--accent-color); }
+            .toast.error { border-color: var(--danger-color); }
+
+            /* ── Sub-tabs (Custom / Presets) ───────────────────────────── */
+            .bg-subtabs {
+                display: flex; gap: 6px;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 8px; padding: 4px; margin-bottom: 16px;
+            }
+            .bg-subtab {
+                flex: 1; background: transparent; color: var(--muted-color);
+                border: none; border-radius: 6px; padding: 8px 12px;
+                font-size: 13px; font-weight: 500; cursor: pointer;
+                transition: background 0.15s ease, color 0.15s ease;
+            }
+            .bg-subtab:hover { color: var(--text-color); }
+            .bg-subtab.active { background: var(--accent-color); color: #fff; }
+            .bg-subtab:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+            .subtab-count { margin-left: 6px; font-size: 11px; color: inherit; opacity: 0.75; }
+
+            /* ── Empty state for the Custom sub-tab ────────────────────── */
+            .tm-empty {
+                text-align: center; padding: 36px 20px;
+                background: var(--card-bg-elevated);
+                border: 1px dashed var(--border-color); border-radius: 10px;
+            }
+            .tm-empty-headline { font-size: 15px; font-weight: 600; color: var(--text-color); margin-bottom: 6px; }
+            .tm-empty-sub { font-size: 13px; color: var(--muted-color); margin-bottom: 16px; }
+            .tm-empty-actions { display: flex; gap: 8px; justify-content: center; }
+
+            /* ── Schema docs disclosure ────────────────────────────────── */
+            details.schema-docs {
+                margin-top: 12px; border: 1px solid var(--border-color);
+                border-radius: 8px; background: var(--card-bg-elevated); padding: 0;
+            }
+            details.schema-docs > summary {
+                cursor: pointer; padding: 10px 12px; font-size: 13px; font-weight: 500;
+                color: var(--text-color); list-style: none; outline: none;
+            }
+            details.schema-docs > summary::marker { display: none; }
+            details.schema-docs > summary::-webkit-details-marker { display: none; }
+            details.schema-docs > summary::before {
+                content: "▸ "; color: var(--muted-color); margin-right: 4px;
+                display: inline-block; transition: transform 0.15s ease;
+            }
+            details.schema-docs[open] > summary::before { content: "▾ "; }
+            details.schema-docs .schema-body { padding: 0 14px 14px; font-size: 12px; color: var(--text-color); line-height: 1.55; }
+            details.schema-docs .schema-body p { margin: 8px 0; color: var(--muted-color); }
+            details.schema-docs .schema-body table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+            details.schema-docs .schema-body th, details.schema-docs .schema-body td {
+                text-align: left; padding: 4px 8px;
+                border-bottom: 1px solid var(--border-color); vertical-align: top;
+            }
+            details.schema-docs .schema-body th {
+                font-size: 11px; text-transform: uppercase; color: var(--muted-color);
+                letter-spacing: 0.5px; font-weight: 600;
+            }
+            details.schema-docs .schema-body code {
+                font-family: ui-monospace, "SFMono-Regular", monospace;
+                font-size: 11px; color: var(--accent-color);
+            }
+            details.schema-docs .schema-body pre {
+                background: var(--bg-color); border: 1px solid var(--border-color);
+                border-radius: 6px; padding: 10px 12px; font-size: 11px;
+                color: var(--text-color); overflow-x: auto; white-space: pre;
+            }
+            .template-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+            .template-row .template-hint { font-size: 12px; color: var(--muted-color); }
+
+            /* ── Per-issue import error list ───────────────────────────── */
+            .import-issues { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+            .import-issue {
+                border: 1px solid var(--border-color); border-radius: 8px;
+                padding: 10px 12px; font-size: 12px; line-height: 1.5;
+                background: var(--card-bg-elevated);
+            }
+            .import-issue.error { border-color: rgba(220, 38, 38, 0.45); background: rgba(220, 38, 38, 0.08); color: #fecaca; }
+            .import-issue.warning { border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.10); color: #fde68a; }
+            .import-issue-title { font-weight: 600; margin-bottom: 2px; }
+            .import-issue-hint  { color: var(--muted-color); font-size: 11px; margin-top: 4px; }
+            .import-issue-file  { font-size: 11px; color: var(--muted-color); font-family: ui-monospace, "SFMono-Regular", monospace; }
+
+            /* ── Editor modal ───────────────────────────────────────────── */
+            .editor-backdrop {
+                position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+                display: none; align-items: flex-start; justify-content: center;
+                z-index: 200; padding: 24px; overflow-y: auto;
+            }
+            .editor-backdrop.visible { display: flex; }
+            .editor {
+                background: var(--card-bg); border: 1px solid var(--border-color);
+                border-radius: 10px; width: min(620px, 100%);
+                box-shadow: var(--shadow); margin: auto 0;
+            }
+            .editor-header {
+                display: flex; align-items: center; justify-content: space-between;
+                padding: 18px 22px; border-bottom: 1px solid var(--border-color);
+            }
+            .editor-header h2 { font-size: 16px; font-weight: 600; }
+            .editor-header button.icon-close {
+                width: 32px; height: 32px; background: transparent; border: none;
+                color: var(--muted-color); font-size: 20px; cursor: pointer; border-radius: 6px;
+            }
+            .editor-header button.icon-close:hover { background: var(--card-bg-elevated); color: var(--text-color); }
+            .editor-body { padding: 18px 22px; max-height: calc(100vh - 220px); overflow-y: auto; }
+            .editor-body label.field-label {
+                display: block; font-size: 12px; font-weight: 600; color: var(--muted-color);
+                text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 6px;
+            }
+            .editor-body label.field-label:first-child { margin-top: 0; }
+            .name-row { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+            .name-row input[type="text"], .text-input, .select-input {
+                flex: 1; width: 100%; background: var(--bg-color);
+                border: 1px solid var(--border-color); border-radius: 6px;
+                color: var(--text-color); font-size: 14px; padding: 10px 12px;
+                outline: none; transition: border-color 0.2s;
+            }
+            .name-row input[type="text"]:focus, .text-input:focus, .select-input:focus { border-color: var(--accent-color); }
+            .name-row input[type="text"].error, .text-input.error { border-color: var(--danger-color); }
+            .name-counter { font-size: 12px; color: var(--muted-color); min-width: 50px; text-align: right; }
+            .field-error { color: var(--danger-hover); font-size: 12px; min-height: 16px; margin-bottom: 4px; }
+            .field-hint { font-size: 12px; color: var(--muted-color); margin-top: 6px; line-height: 1.5; }
+            #editor-save.is-disabled { opacity: 0.5; cursor: not-allowed; }
+
+            .source-info {
+                font-size: 12px; color: var(--muted-color);
+                background: var(--bg-color); border: 1px solid var(--border-color);
+                border-radius: 6px; padding: 8px 10px; margin-top: 8px;
+                word-break: break-all;
+            }
+            .source-info strong { color: var(--text-color); }
+
+            .var-section-label {
+                font-size: 12px; font-weight: 600; color: var(--muted-color);
+                text-transform: uppercase; letter-spacing: 0.6px; margin: 18px 0 8px;
+                padding-bottom: 6px; border-bottom: 1px solid var(--border-color);
+            }
+            .font-preview {
+                background: var(--bg-color); border: 1px solid var(--border-color);
+                border-radius: 8px; padding: 16px; font-size: 22px; line-height: 1.4;
+                color: var(--text-color); min-height: 64px;
+                word-break: break-word;
+            }
+
+            .editor-notice {
+                display: flex; align-items: center; gap: 10px;
+                background: rgba(245, 158, 11, 0.12);
+                border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24;
+                border-radius: 8px; padding: 10px 12px; margin: 10px 0 4px;
+                font-size: 12px; line-height: 1.5;
+            }
+
+            .editor-footer {
+                display: flex; align-items: center; justify-content: space-between;
+                gap: 12px; padding: 16px 22px; border-top: 1px solid var(--border-color);
+            }
+            .editor-footer .footer-status { color: var(--danger-hover); font-size: 13px; flex: 1; }
+            .editor-footer .footer-actions { display: flex; gap: 8px; }
+        </style>
+    </head>
+
+    <body>
+        <div class="page">
+            <header class="page-header">
+                <div>
+                    <h1>Font Manager</h1>
+                    <div class="subtitle">
+                        Upload, import, create, and switch between custom WhatsApp Web fonts.
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="primary" id="create-font-btn" type="button">+ Create Font</button>
+                </div>
+            </header>
+
+            <div class="panels">
+                <div class="panel">
+                    <h2>Upload font files</h2>
+                    <div class="drop-zone" id="drop-zone" tabindex="0">
+                        <div>Drop font files here or <strong>click to browse</strong></div>
+                        <div class="drop-hint">.woff2, .woff, .ttf, .otf — up to 5 MB each (or a font-definition .json)</div>
+                    </div>
+                    <input
+                        type="file"
+                        id="file-input"
+                        accept=".woff2,.woff,.ttf,.otf,.json,font/woff2,font/woff,font/ttf,font/otf,application/font-woff,application/x-font-ttf,application/json"
+                        multiple
+                        style="display: none"
+                    />
+                    <div class="status-line info" id="upload-status"></div>
+                    <div class="import-issues" id="import-issues"></div>
+
+                    <div class="template-row">
+                        <button class="secondary" id="download-template-btn" type="button">Download template</button>
+                        <span class="template-hint">A ready-to-edit font definition JSON.</span>
+                    </div>
+
+                    <details class="schema-docs">
+                        <summary>What can I add here?</summary>
+                        <div class="schema-body" id="schema-docs-body">
+                            <!-- Populated by fonts-manage.js. -->
+                        </div>
+                    </details>
+                </div>
+
+                <div class="panel">
+                    <h2>Load from URL</h2>
+                    <div class="url-row">
+                        <input type="url" id="url-input"
+                            placeholder="https://fonts.gstatic.com/s/…/font.woff2"
+                            autocomplete="off" spellcheck="false" />
+                        <input type="text" id="url-name" class="url-name" placeholder="Display name (optional)" />
+                        <button class="primary" id="url-add-btn" disabled>Add</button>
+                    </div>
+                    <div class="status-line info" id="url-status"></div>
+                    <p class="field-hint">
+                        Paste a direct link to a font file (ending in <code>.woff2</code>,
+                        <code>.woff</code>, <code>.ttf</code>, or <code>.otf</code>) — for example a
+                        <code>fonts.gstatic.com</code> URL from Google Fonts. The font is referenced by
+                        URL and loads whenever WhatsApp Web is open. No link handy? Use
+                        <strong>Upload</strong> above to add a font file from your computer.
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-subtabs" role="tablist">
+                <button
+                    type="button"
+                    class="bg-subtab active"
+                    data-fm-subtab="fm-customs"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="fm-customs"
+                >Custom <span class="subtab-count" id="fm-customs-count" hidden></span></button>
+                <button
+                    type="button"
+                    class="bg-subtab"
+                    data-fm-subtab="fm-presets"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="fm-presets"
+                >Presets</button>
+            </div>
+
+            <div class="bg-subpane" id="fm-customs" role="tabpanel">
+                <section class="library">
+                    <div class="library-header">
+                        <div>
+                            <h2>Custom Fonts</h2>
+                            <div class="library-count" id="custom-count"></div>
+                        </div>
+                        <button class="secondary" id="export-all-btn">Export All</button>
+                    </div>
+                    <div class="grid" id="customs-grid"></div>
+
+                    <div class="tm-empty" id="fm-empty" style="display: none">
+                        <div class="tm-empty-headline">No custom fonts yet</div>
+                        <p class="tm-empty-sub">
+                            Upload a font file, load one from a URL, or create one from a Google Font.
+                        </p>
+                        <div class="tm-empty-actions">
+                            <button class="primary" id="fm-empty-create" type="button">+ Create Font</button>
+                            <button class="secondary" id="fm-empty-import" type="button">Upload a font</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="bg-subpane" id="fm-presets" role="tabpanel" hidden>
+                <section class="library">
+                    <div class="library-header">
+                        <div>
+                            <h2>Preset Fonts</h2>
+                            <div class="library-count">Built-in — non-deletable</div>
+                        </div>
+                    </div>
+                    <div class="grid" id="presets-grid"></div>
+                </section>
+            </div>
+        </div>
+
+        <div class="toast" id="toast"></div>
+
+        <!-- ── Editor modal ────────────────────────────────────────────── -->
+        <div class="editor-backdrop" id="editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+            <div class="editor">
+                <div class="editor-header">
+                    <h2 id="editor-title">Create Font</h2>
+                    <button class="icon-close" id="editor-close" type="button" aria-label="Close editor">✕</button>
+                </div>
+                <div class="editor-body">
+                    <label class="field-label" for="editor-name">Name</label>
+                    <div class="name-row">
+                        <input type="text" id="editor-name" maxlength="40" placeholder="My font" autocomplete="off" />
+                        <span class="name-counter" id="editor-name-counter">0 / 40</span>
+                    </div>
+                    <div class="field-error" id="editor-name-error"></div>
+
+                    <div class="editor-notice" id="editor-notice" style="display: none"></div>
+
+                    <label class="field-label" for="editor-family">Font family</label>
+                    <input type="text" id="editor-family" class="text-input" placeholder="e.g. Roboto" autocomplete="off" />
+                    <p class="field-hint" id="editor-family-hint">
+                        For a Google Font, type its exact name (e.g. “Open Sans”). It loads
+                        automatically from Google Fonts.
+                    </p>
+
+                    <div class="source-info" id="editor-source-info" style="display: none"></div>
+
+                    <label class="field-label" for="editor-fallback">Fallback</label>
+                    <select id="editor-fallback" class="select-input">
+                        <option value="sans-serif">Sans-serif</option>
+                        <option value="serif">Serif</option>
+                        <option value="monospace">Monospace</option>
+                    </select>
+
+                    <div class="var-section-label">Preview</div>
+                    <div class="font-preview" id="editor-preview">
+                        The quick brown fox jumps over the lazy dog — 1234567890
+                    </div>
+                </div>
+                <div class="editor-footer">
+                    <div class="footer-status" id="editor-footer-status"></div>
+                    <div class="footer-actions">
+                        <button class="secondary" id="editor-cancel" type="button">Cancel</button>
+                        <button class="primary" id="editor-save" type="button">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="track.js" defer></script>
+        <script src="fonts-presets.js" defer></script>
+        <script src="fonts-manage.js" defer></script>
+        <script src="font-name-validation.js" defer></script>
+    </body>
+</html>
