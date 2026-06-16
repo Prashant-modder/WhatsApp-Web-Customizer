@@ -29,6 +29,7 @@
         <script src="quick-replies.js" defer></script>
         <script src="themes-presets.js" defer></script>
         <script src="themes.js" defer></script>
+        <script src="save-nudge.js" defer></script>
         <script src="fonts-presets.js" defer></script>
         <script src="fonts.js" defer></script>
         <script src="animated-bg-popup.js" defer></script>
@@ -922,6 +923,43 @@
             #tab-typography .ts-size-row .text-secondary {
                 color: var(--ts-muted) !important;
             }
+
+            /* ---- Save-this-theme nudge (Task 1: anti-reset activation) ---- */
+            .save-nudge {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin: 0 0 14px;
+                padding: 10px 12px;
+                background: var(--wa-surface);
+                border: 1px solid var(--wa-accent);
+                border-radius: 10px;
+                box-shadow: var(--wa-glow);
+            }
+            .save-nudge[hidden] { display: none; }
+            .save-nudge .save-nudge-text {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                font-size: 12px;
+                line-height: 1.35;
+                color: var(--wa-text);
+            }
+            .save-nudge .save-nudge-text strong { color: var(--wa-accent-hover); }
+            .save-nudge .save-nudge-text span { color: var(--wa-muted); }
+            .save-nudge .save-nudge-actions {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                flex-shrink: 0;
+            }
+            .save-nudge .save-nudge-actions .btn-link {
+                color: var(--wa-muted);
+                text-decoration: none;
+                padding: 4px 6px;
+            }
+            .save-nudge .save-nudge-actions .btn-link:hover { color: var(--wa-text); }
         </style>
     </head>
 
@@ -1289,6 +1327,25 @@
                             <strong>Manage Items</strong> to import your own,
                             or <strong>Reset</strong> to revert to WhatsApp's default.
                         </p>
+
+                        <!-- Anti-reset "save your look" nudge. Hidden by default;
+                             revealed by save-nudge.js after the user has applied 3+
+                             themes in a session without ever saving one. Self-suppresses
+                             (≤1/session, ≤3 lifetime, never after a save). -->
+                        <div id="save-nudge" class="save-nudge" role="status" aria-live="polite" hidden>
+                            <div class="save-nudge-text">
+                                <strong id="save-nudge-title">Found a look you like?</strong>
+                                <span id="save-nudge-msg">Save it as a custom theme so it's one tap away next time.</span>
+                            </div>
+                            <div class="save-nudge-actions">
+                                <button id="save-nudge-save" type="button" class="btn btn-sm btn-success">
+                                    Save this theme
+                                </button>
+                                <button id="save-nudge-dismiss" type="button" class="btn btn-sm btn-link" aria-label="Dismiss">
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
 
                         <!-- Sub-tab toggle: Presets vs Custom. Mirrors the Backgrounds
                              tab pattern (same .bg-subtabs/.bg-subtab classes) so the
