@@ -259,6 +259,20 @@
     }
   }
 
+  // Cheap, locale-agnostic shape check used to gate the Add button: a trimmed,
+  // parseable http(s) URL. We deliberately do not require a font extension —
+  // Google Fonts CSS endpoints (fonts.googleapis.com/css2?...) have none.
+  function isPlausibleUrl(value) {
+    const v = String(value || "").trim();
+    if (!v) return false;
+    try {
+      const u = new URL(v);
+      return u.protocol === "http:" || u.protocol === "https:";
+    } catch (e) {
+      return false;
+    }
+  }
+
   /* ── import from file(s): font binaries and/or JSON definitions ─────── */
 
   async function importFiles(fileList, method) {
@@ -397,6 +411,10 @@
   /* ── load from URL ─────────────────────────────────────────────────── */
 
   async function importFromUrl(url, displayName) {
+    // Defensive only: the UI now disables the Add button while the field is
+    // empty, so this branch is unreachable from the popup and empty_url should
+    // fall to ~0 in analytics. Kept so programmatic callers still fail safely.
+    // TODO(churn-update): support paste-from-clipboard font import into this field.
     if (!url) {
       reportRejected(["empty_url"], "url");
       setStatus("url-status", "Enter a URL first.", "error");
@@ -424,6 +442,7 @@
         },
       });
       track("font_imported", { method: "url", added_count: 1, failed_count: 0 });
+      track("font_import_succeeded", { method: "url" });
       setStatus("url-status", "Added.", "success");
       toast(`Added "${family}".`, "success");
       renderAll();
@@ -1019,15 +1038,48 @@
     });
     fileInput.addEventListener("change", (e) => importFiles(e.target.files, "file_picker"));
 
-    // Load from URL.
+    // Load from URL. The Add button stays disabled until the field holds a
+    // plausibly-valid http(s) URL, so the empty-URL dead end (100% of past
+    // font_import_rejected events) is structurally impossible to submit.
     const urlInput = document.getElementById("url-input");
     const urlName = document.getElementById("url-name");
     const urlBtn = document.getElementById("url-add-btn");
-    const doUrl = () => importFromUrl((urlInput.value || "").trim(), urlName.value || "");
+
+    const syncUrlBtn = () => {
+      const raw = (urlInput.value || "").trim();
+      const ok = isPlausibleUrl(raw);
+      urlBtn.disabled = !ok;
+      // Inline, field-level validation: silent while empty (the disabled button
+      // + helper text guide the user), error styling only once they've typed
+      // something that isn't a usable URL.
+      if (!raw) {
+        urlInput.classList.remove("invalid");
+        setStatus("url-status", "", "info");
+      } else if (!ok) {
+        urlInput.classList.add("invalid");
+        setStatus("url-status", "Enter a full link starting with https://", "error");
+      } else {
+        urlInput.classList.remove("invalid");
+        setStatus("url-status", "", "info");
+      }
+    };
+
+    const doUrl = () => {
+      const raw = (urlInput.value || "").trim();
+      if (!isPlausibleUrl(raw)) {
+        syncUrlBtn();
+        return;
+      }
+      track("font_import_started", { method: "url" });
+      importFromUrl(raw, urlName.value || "");
+    };
+
+    urlInput.addEventListener("input", syncUrlBtn);
     urlBtn.addEventListener("click", doUrl);
     urlInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") doUrl();
     });
+    syncUrlBtn();
 
     // Export all + header create.
     const exportAllBtn = document.getElementById("export-all-btn");
