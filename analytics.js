@@ -200,7 +200,14 @@
     console.warn("[analytics] flush failed, backing off:", err && err.message, "fails=" + fails);
 
     // 3. Aggregated drop count (count only, no PII).
-    if (dropped > 0) await enqueueInternal("analytics_events_dropped", { count: dropped });
+    var failReason = classifyError(err);
+    if (dropped > 0)
+      await enqueueInternal("analytics_events_dropped", {
+        count: dropped,
+        reason: "max_attempts_exceeded",
+        batch_size: batchLen,
+        queue_depth: survivors.length,
+      });
 
     // 4. Best-effort circuit-open notice (queued, respects the breaker).
     if (openedNow) {
@@ -214,13 +221,31 @@
     // 5. One bounded failure report per attempt. Attempts are now rate-limited
     //    by backoff/circuit, so this volume falls sharply versus the old
     //    every-30s loop.
-    var cls = classifyError(err);
+    var cls = failReason;
     await enqueueInternal("analytics_flush_failed", {
-      status: cls,
-      error_class: cls,
+      status: cls, // kept for analytics continuity (pre-existing key)
+      error_class: cls, // kept for analytics continuity (pre-existing key)
+      reason: cls, // brief Task 3: explicit diagnostic field
       endpoint_status: typeof status === "number" ? status : null,
       batch_size: batchLen,
+      queue_depth: survivors.length,
     });
+  }
+
+  // Half-open the breaker at the start of a new browser session: clear the
+  // open/backoff windows so the very next flush() probes the endpoint, but KEEP
+  // the failure count. A probe that fails immediately re-opens the circuit
+  // (fails is still >= threshold); a probe that succeeds fully resets it. This
+  // stops a circuit that opened in a prior session from staying hard-blocked.
+  async function halfOpenForNewSession() {
+    try {
+      var s = await getFlushState();
+      if (s.openUntil || s.nextAt) {
+        await setFlushState({ fails: s.fails, nextAt: 0, openUntil: 0 });
+      }
+    } catch (err) {
+      /* best-effort */
+    }
   }
 
   async function flush() {
@@ -291,12 +316,14 @@
         });
       }
       await setupUninstallTracking();
+      await halfOpenForNewSession();
       await flush();
     });
 
     chrome.runtime.onStartup.addListener(async () => {
       await capture("extension_started", { version: chrome.runtime.getManifest().version });
       await setupUninstallTracking();
+      await halfOpenForNewSession();
       await flush();
     });
   }

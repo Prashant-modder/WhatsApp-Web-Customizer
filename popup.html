@@ -49,13 +49,18 @@
                 --wa-glow: 0 0 8px rgba(16, 185, 129, 0.3);
                 --bs-success: #10b981;
                 --bs-success-rgb: 16, 185, 129;
+                /* Fixed chrome font. The popup is extension chrome and must NEVER
+                   read the user font (--wc-user-font is deliberately not defined
+                   in this document), so it can't render in a pixel/script face. */
+                --wc-ui-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+                    Helvetica, Arial, sans-serif;
             }
 
             html,
             body {
                 background-color: var(--wa-bg);
                 color: var(--wa-text);
-                font-family: "Inter", sans-serif;
+                font-family: var(--wc-ui-font);
             }
 
             body {
@@ -1317,15 +1322,17 @@
                                 <button id="open-theme-manager" type="button" class="btn btn-sm btn-outline-success">
                                     Manage Items
                                 </button>
-                                <button id="reset-theme" type="button" class="btn btn-sm btn-outline-secondary">
-                                    Reset
+                                <button id="reset-theme" type="button" class="btn btn-sm btn-outline-light" title="Revert WhatsApp to its default theme">
+                                    ↺ Revert to default
                                 </button>
                             </div>
                         </div>
                         <p class="text-secondary small mb-3">
-                            Click any theme below to apply it instantly. Use
-                            <strong>Manage Items</strong> to import your own,
-                            or <strong>Reset</strong> to revert to WhatsApp's default.
+                            <strong>Hover</strong> a theme to preview it live on
+                            WhatsApp; <strong>click</strong> to apply. Use
+                            <strong>Manage Items</strong> to import your own, or
+                            <strong>↺ Revert to default</strong> to go back to
+                            WhatsApp's default at any time.
                         </p>
 
                         <!-- Anti-reset "save your look" nudge. Hidden by default;
@@ -1429,15 +1436,16 @@
                                 <button id="open-font-manager" type="button" class="btn btn-sm btn-outline-success">
                                     Manage Fonts
                                 </button>
-                                <button id="reset-font" type="button" class="btn btn-sm btn-outline-secondary">
-                                    Reset
+                                <button id="reset-font" type="button" class="btn btn-sm btn-outline-light" title="Revert WhatsApp to its default font">
+                                    ↺ Revert to default
                                 </button>
                             </div>
                         </div>
                         <p class="ts-hint">
-                            Click any font below to apply it instantly. Use Manage Fonts to
-                            upload your own or load one from a URL, or Reset to revert to
-                            WhatsApp's default.
+                            <strong>Hover</strong> a font to preview it live on WhatsApp;
+                            <strong>click</strong> to apply. Use Manage Fonts to upload your
+                            own or load one from a URL, or <strong>↺ Revert to default</strong>
+                            to go back to WhatsApp's default at any time.
                         </p>
 
                         <!-- Presets vs Custom — same .bg-subtabs/.bg-subtab pattern as Themes. -->
@@ -1695,6 +1703,20 @@
             <div class="modal-card">
                 <h3 id="modal-title" class="h6 m-0">Image Selection</h3>
                 <div id="modal-gallery"></div>
+                <div
+                    id="modal-error"
+                    role="alert"
+                    style="
+                        display: none;
+                        color: #ff6b6b;
+                        background: rgba(255, 107, 107, 0.1);
+                        border: 1px solid rgba(255, 107, 107, 0.35);
+                        border-radius: 8px;
+                        padding: 8px 10px;
+                        margin-top: 10px;
+                        font-size: 13px;
+                    "
+                ></div>
                 <div class="d-flex flex-wrap gap-2 mt-3">
                     <button id="modal-upload" type="button" class="btn btn-sm btn-success flex-fill">
                         Manage Images
