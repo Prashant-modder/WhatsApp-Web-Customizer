@@ -29,6 +29,8 @@
   var DISTINCT_ID_KEY = "analytics_distinct_id";
   var QUEUE_KEY = "analytics_queue";
   var FLUSH_STATE_KEY = "analytics_flush_state"; // additive, migration-safe
+  var OVERFLOW_KEY = "analytics_overflow_dropped"; // pending cap-overflow drop count
+  var CONFIG_KEY = "analytics_config"; // optional runtime overrides (e.g. circuitThreshold)
 
   // Resilience tuning.
   var QUEUE_CAP = 200; // max queued events (unchanged)
@@ -99,6 +101,32 @@
     await chrome.storage.local.set({ [FLUSH_STATE_KEY]: state });
   }
 
+  // Circuit-breaker threshold: N consecutive failures before the breaker opens.
+  // Defaults to CIRCUIT_THRESHOLD, overridable at runtime without a redeploy via
+  // chrome.storage.local[CONFIG_KEY] = { circuitThreshold: <positive int> }.
+  async function getCircuitThreshold() {
+    try {
+      var cfg = (await chrome.storage.local.get(CONFIG_KEY))[CONFIG_KEY];
+      var n = cfg && Number(cfg.circuitThreshold);
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : CIRCUIT_THRESHOLD;
+    } catch (err) {
+      return CIRCUIT_THRESHOLD;
+    }
+  }
+
+  // Accumulate cap-overflow losses in a persisted counter instead of emitting an
+  // event here — capture() is the overflow site, so emitting would recurse
+  // through the same queue during the very outage that is causing the overflow.
+  // onFlushSuccess() reports the aggregate once the pipe is healthy again.
+  async function bumpOverflowDropped(n) {
+    try {
+      var cur = Number((await chrome.storage.local.get(OVERFLOW_KEY))[OVERFLOW_KEY] || 0);
+      await chrome.storage.local.set({ [OVERFLOW_KEY]: cur + n });
+    } catch (err) {
+      /* best-effort */
+    }
+  }
+
   // Build the queued record. `_a` (attempts) is a top-level bookkeeping field
   // that is never sent to PostHog (the batch mapper only reads
   // event/properties/timestamp/distinct_id).
@@ -120,7 +148,11 @@
     };
     var queue = await getQueue();
     queue.push(record);
-    if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+    if (queue.length > QUEUE_CAP) {
+      var overflow = queue.length - QUEUE_CAP;
+      queue.splice(0, overflow); // enforce the cap by dropping the oldest
+      await bumpOverflowDropped(overflow); // surfaced as analytics_events_dropped on next healthy flush
+    }
     await setQueue(queue);
   }
 
@@ -161,13 +193,33 @@
 
   /* ── flush ───────────────────────────────────────────────────────────── */
 
-  async function onFlushSuccess(sentCount) {
-    // Re-read the queue (capture may have appended while the POST was in
-    // flight) and drop the first `sentCount` events we just delivered. New
-    // events are only ever appended at the tail, so a head-slice is safe.
+  async function onFlushSuccess(sentBatch) {
+    // Re-read the queue (capture may have appended — or trimmed the head via the
+    // overflow cap — while the POST was in flight) and remove exactly the events
+    // we delivered, matched by $insert_id. This is robust to head-trimming that a
+    // blind head-slice would misalign, and cannot drop events captured mid-flight.
+    var sentIds = new Set(
+      sentBatch.map((r) => r && r.properties && r.properties.$insert_id).filter(Boolean),
+    );
     var queue = await getQueue();
-    await setQueue(queue.slice(sentCount));
+    var remaining = queue.filter((ev) => !sentIds.has(ev.properties && ev.properties.$insert_id));
+    await setQueue(remaining);
     await setFlushState({ fails: 0, nextAt: 0, openUntil: 0 });
+
+    // Now that a flush has landed, report any queue-overflow losses as a single
+    // aggregated event (count only, no PII) — parity with the retry-cap drop path.
+    try {
+      var over = Number((await chrome.storage.local.get(OVERFLOW_KEY))[OVERFLOW_KEY] || 0);
+      if (over > 0) {
+        await chrome.storage.local.set({ [OVERFLOW_KEY]: 0 });
+        await enqueueInternal("analytics_events_dropped", {
+          count: over,
+          reason: "queue_overflow",
+        });
+      }
+    } catch (err) {
+      /* best-effort */
+    }
   }
 
   async function onFlushFailure(err, status, batchLen) {
@@ -190,10 +242,11 @@
       nextAt: Date.now() + computeBackoff(fails, hardBlocked),
       openUntil: prev.openUntil,
     };
+    var threshold = await getCircuitThreshold();
     var openedNow = false;
-    if (fails >= CIRCUIT_THRESHOLD) {
+    if (fails >= threshold) {
       next.openUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
-      openedNow = fails === CIRCUIT_THRESHOLD; // emit once per failure episode
+      openedNow = fails === threshold; // emit once per failure episode
     }
     await setFlushState(next);
 
@@ -273,7 +326,7 @@
         status = resp.status;
         throw new Error(`PostHog returned ${resp.status}`);
       }
-      await onFlushSuccess(batch.length);
+      await onFlushSuccess(batch);
     } catch (err) {
       await onFlushFailure(err, status, batch.length);
     }
