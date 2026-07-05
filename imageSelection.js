@@ -4,6 +4,32 @@ function showModalError(msg){const el=document.getElementById("modal-error");el&
 function clearModalError(){showModalError("")}
 // Byte size of the image actually persisted (decoded from the base64 dataURL).
 function dataUrlByteSize(d){try{if("string"!=typeof d)return null;const i=d.indexOf(",");const b=i>=0?d.slice(i+1):d;const pad=b.endsWith("==")?2:b.endsWith("=")?1:0;return Math.max(0,Math.floor(b.length*3/4)-pad)}catch(e){return null}}
+/* ── oversized-image optimisation (Task 3) ───────────────────────────────────
+ * Backgrounds don't need more than ~1080p; large uploads bloat storage/memory and
+ * are the size path behind background_slot_set_failed. Downscale + re-encode
+ * oversized raster images before persisting. Best-effort: ANY failure returns the
+ * original untouched, so optimisation can only help — it never adds a failure. */
+const WC_IMG_MAX_DIM=1920,WC_IMG_MAX_BYTES=2e6;
+function wcLoadImage(src){return new Promise((res,rej)=>{const i=new Image;i.onload=()=>res(i);i.onerror=()=>rej(new Error("image decode failed"));i.src=src})}
+async function optimizeImageDataUrl(dataUrl){
+  try{
+    if("string"!=typeof dataUrl||!dataUrl.startsWith("data:image/"))return{dataUrl:dataUrl,optimized:!1};
+    if(/^data:image\/svg\+xml/i.test(dataUrl))return{dataUrl:dataUrl,optimized:!1}; // vector: tiny, and would rasterise
+    const originalBytes=dataUrlByteSize(dataUrl);
+    const img=await wcLoadImage(dataUrl);
+    const oversized=originalBytes&&originalBytes>WC_IMG_MAX_BYTES||img.naturalWidth>WC_IMG_MAX_DIM||img.naturalHeight>WC_IMG_MAX_DIM;
+    if(!oversized)return{dataUrl:dataUrl,optimized:!1};
+    const scale=Math.min(1,WC_IMG_MAX_DIM/Math.max(img.naturalWidth,img.naturalHeight));
+    const w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
+    const canvas=document.createElement("canvas");canvas.width=w,canvas.height=h;
+    const ctx=canvas.getContext("2d");if(!ctx)return{dataUrl:dataUrl,optimized:!1};
+    ctx.drawImage(img,0,0,w,h);
+    let q=.85,out=canvas.toDataURL("image/jpeg",q);
+    while(dataUrlByteSize(out)>WC_IMG_MAX_BYTES&&q>.5){q=Math.round(10*(q-.1))/10;out=canvas.toDataURL("image/jpeg",q)}
+    // Only adopt the re-encode if it is genuinely smaller than the original.
+    return dataUrlByteSize(out)<originalBytes?{dataUrl:out,optimized:!0,originalBytes:originalBytes}:{dataUrl:dataUrl,optimized:!1}
+  }catch(e){return{dataUrl:dataUrl,optimized:!1}}
+}
 // Three-way origin taxonomy for analytics: 'preset' (a bundled gallery image),
 // 'url' (the user added their own image by URL — uploadedImages entries record
 // source:"url"/originalUrl in manage-images.js), or 'upload' (a user file).
@@ -19,12 +45,15 @@ function slotErrorMessage(reason){switch(reason){case"cors_or_network":return"Th
   const slot=currentType,src=selectedSrc,origLabel=modalSaveBtn.textContent;
   const source=classifySlotSource(src); // 'preset' | 'upload' | 'url'
   clearModalError(),modalSaveBtn.disabled=!0,modalSaveBtn.textContent="Saving…";
+  let dataUrl=null,optimized=!1,originalBytes=null;
   try{
     // 1. Acquire a persistable dataURL (uploaded images already are one).
-    let dataUrl;
     try{dataUrl=await ensureDataUrl(src)}
     catch(err){throw Object.assign(new Error(err&&err.message||"prepare failed"),{reason:classifySlotError(err)})}
     if(!dataUrl)throw Object.assign(new Error("could not prepare image"),{reason:"cors_or_network"});
+    // 1.5 Downscale/re-encode oversized images so large uploads succeed instead
+    //     of failing on storage/memory. Best-effort — returns the original on any error.
+    {const _opt=await optimizeImageDataUrl(dataUrl);dataUrl=_opt.dataUrl,optimized=_opt.optimized,originalBytes=_opt.originalBytes||null}
     // 2. Persist, surfacing storage failures (e.g. quota) instead of swallowing
     //    the callback — the old code ignored chrome.runtime.lastError entirely.
     await new Promise((res,rej)=>{chrome.storage.local.set({[slot]:dataUrl},()=>{const le=chrome.runtime.lastError;le?rej(Object.assign(new Error(le.message||"storage write failed"),{reason:/quota/i.test(le.message||"")?"storage_quota":"unknown"})):res()})});
@@ -33,12 +62,12 @@ function slotErrorMessage(reason){switch(reason){case"cors_or_network":return"Th
     let replacedAnimation=!1;
     if("chatview"===slot){const cur=await new Promise(r=>chrome.storage.local.get(["animated_background"],r));cur.animated_background&&(replacedAnimation=!0,await new Promise(r=>chrome.storage.local.remove("animated_background",r)))}
     // 4. Success telemetry with the shape the brief asks for.
-    try{if(window.track){const props={slot:slot,source:source,file_size_bytes:dataUrlByteSize(dataUrl)};"chatview"===slot&&(props.replaced_animation=replacedAnimation),window.track("background_slot_set",props)}}catch(e){}
+    try{if(window.track){const props={slot:slot,source:source,file_size_bytes:dataUrlByteSize(dataUrl),optimized:optimized};optimized&&originalBytes&&(props.original_size_bytes=originalBytes),"chatview"===slot&&(props.replaced_animation=replacedAnimation),window.track("background_slot_set",props)}}catch(e){}
     closeModal("saved")
   }catch(err){
     const reason=classifySlotError(err);
     console.error("[background] slot set failed:",reason,err);
-    try{window.track&&window.track("background_slot_set_failed",{slot:slot,source:source,reason:reason})}catch(e){}
+    try{window.track&&window.track("background_slot_set_failed",{slot:slot,source:source,reason:reason,file_size_bytes:dataUrl?dataUrlByteSize(dataUrl):null})}catch(e){}
     showModalError(slotErrorMessage(reason))
   }finally{modalSaveBtn.disabled=!1,modalSaveBtn.textContent=origLabel}
 }),document.getElementById("modal-none").addEventListener("click",()=>{if(currentType){const e=currentType;chrome.storage.local.remove(e),setPreview(e,null);try{window.track&&window.track("background_slot_cleared",{slot:e})}catch(e){}}closeModal("cleared")}),document.getElementById("modal-cancel").addEventListener("click",()=>closeModal("cancel")),document.addEventListener("click",e=>{const a=e.target.closest(".image-option[data-type]");a&&openModal(a.dataset.type)});
