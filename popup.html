@@ -27,6 +27,7 @@
         <script src="fontSizeChange.js" defer></script>
         <script src="imageSelection.js" defer></script>
         <script src="quick-replies.js" defer></script>
+        <script src="preview-bar.js" defer></script>
         <script src="themes-presets.js" defer></script>
         <script src="themes.js" defer></script>
         <script src="save-nudge.js" defer></script>
@@ -383,6 +384,34 @@
                 color: var(--wa-muted);
             }
 
+            /* ---- Task 2: shared sticky Apply bar for uncommitted previews ---- */
+            .preview-bar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 10px 16px;
+                background: var(--wa-surface-2);
+                border-top: 1px solid var(--wa-accent);
+                box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.35);
+            }
+            .preview-bar[hidden] {
+                display: none;
+            }
+            .preview-bar-label {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--wa-text);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .preview-bar-actions {
+                display: flex;
+                gap: 8px;
+                flex-shrink: 0;
+            }
+
             /* ---- First-run "Pick your look" overlay (first-run-theme-picker.js) ---- */
             #onboarding-overlay {
                 position: fixed;
@@ -678,6 +707,26 @@
                 border-radius: 4px;
                 background: var(--wa-accent);
                 color: #fff;
+            }
+            /* Task 2: an uncommitted preview selection — visually distinct from
+               the committed .active card so the two states never read the same. */
+            .theme-card.previewing {
+                border-color: var(--wa-accent-hover);
+                border-style: dashed;
+                box-shadow: var(--wa-glow);
+            }
+            .theme-card.previewing::after {
+                content: "PREVIEW";
+                position: absolute;
+                top: 6px;
+                right: 6px;
+                font-size: 9px;
+                font-weight: 700;
+                letter-spacing: 1px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                background: var(--wa-accent-hover);
+                color: #10221c;
             }
             .theme-swatch {
                 width: 100%;
@@ -1752,6 +1801,35 @@
                     </section>
                 </div>
             </main>
+        </div>
+
+        <!-- Task 2: shared sticky Apply bar for uncommitted theme/font previews.
+             Shown/hidden by preview-bar.js; sits below the tab content so it
+             persists across tab switches and is the single commit affordance. -->
+        <div
+            id="preview-bar"
+            class="preview-bar"
+            role="region"
+            aria-label="Pending preview"
+            hidden
+        >
+            <span id="preview-bar-label" class="preview-bar-label"></span>
+            <div class="preview-bar-actions">
+                <button
+                    id="preview-bar-revert"
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                >
+                    Revert
+                </button>
+                <button
+                    id="preview-bar-apply"
+                    type="button"
+                    class="btn btn-sm btn-success"
+                >
+                    Apply
+                </button>
+            </div>
         </div>
 
         <!-- Image picker modal — kept as overlay div toggled by imageSelection.js

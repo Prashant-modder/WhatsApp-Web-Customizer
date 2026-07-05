@@ -1,9 +1,16 @@
 /* fonts.js
  *
  * Font twin of themes.js. Powers the popup's Typography tab: the Presets/Custom
- * card grid (instant selection), the Create / Manage Fonts / Reset buttons, and
- * keeps the grid live as fonts are added in the manager. Font size is wired
- * separately in fontSizeChange.js.
+ * card grid, the Create / Manage Fonts / Reset buttons, and keeps the grid live
+ * as fonts are added in the manager. Font size is wired in fontSizeChange.js.
+ *
+ * Task 2 preview redesign: selecting a font (click / Enter / Space) PREVIEWS it
+ * live and persistently — it is NOT applied until the user commits via the
+ * shared sticky Apply bar (preview-bar.js). The old hover-preview and the
+ * mouseleave / popup-close "discard" paths are gone; those fired
+ * font_preview_discarded on ordinary browsing and produced the 0-second-discard
+ * noise. Discards now carry a `trigger`: explicit_cancel | replaced_by_other |
+ * applied_elsewhere.
  */
 (function () {
   const ACTIVE_KEY = "fonts:active";
@@ -11,10 +18,12 @@
   const APPLIED_AT_KEY = "fonts:appliedAt";
   let customCount = 0;
   let currentActiveId = null; // committed active font id (from the last render)
-  // True while WhatsApp is showing a transient hover-preview that the user has
-  // NOT committed. Used to revert on popup close and to log preview discards.
+  // Uncommitted preview state. previewId is the font being previewed but not yet
+  // applied; it persists across tab switches (nothing clears it but an explicit
+  // action) and is the source of the sticky Apply bar.
   let previewActive = false;
-  let previewStartedAt = 0; // ms timestamp the current preview episode began
+  let previewId = null;
+  let previewStartedAt = 0;
 
   function track(name, props) {
     try {
@@ -24,9 +33,8 @@
     }
   }
 
-  // Push a transient message to every open WhatsApp Web tab (host permission
-  // covers web.whatsapp.com, so no "tabs" permission is needed). Best-effort:
-  // if WhatsApp isn't open, preview is simply a no-op.
+  // Push a transient message to every open WhatsApp Web tab. Best-effort: if
+  // WhatsApp isn't open, preview is simply a no-op.
   function sendToWhatsApp(msg) {
     try {
       if (!chrome.tabs || !chrome.tabs.query) return;
@@ -45,33 +53,80 @@
     }
   }
 
-  // Live-preview a font without committing it. Only flags previewActive when the
-  // previewed font actually differs from the committed one, so re-hovering the
-  // active card never counts as a discard.
-  function previewFont(entry) {
+  // Toggle the "previewing" affordance on the card matching id (never on the
+  // committed-active card, which keeps its own .active state).
+  function markPreviewing(id) {
+    document.querySelectorAll("#tab-typography .theme-card").forEach((c) => {
+      const on = !!id && c.dataset.id === id && c.dataset.id !== currentActiveId;
+      c.classList.toggle("previewing", on);
+    });
+  }
+
+  function logDiscard(trigger) {
+    const props = { trigger: trigger };
+    if (previewStartedAt)
+      props.seconds_previewed = Math.max(0, Math.floor((Date.now() - previewStartedAt) / 1000));
+    track("font_preview_discarded", props);
+  }
+
+  // Live-preview a font without committing it. Persistent: it stays until the
+  // user applies it, reverts it, or selects a different one.
+  function selectFont(entry) {
     if (!entry || !entry.id) return;
+    // Re-selecting the committed font just cancels any pending preview.
+    if (entry.id === currentActiveId) {
+      revertPreview(null);
+      return;
+    }
+    if (previewActive && previewId && previewId !== entry.id) {
+      logDiscard("replaced_by_other");
+    }
     sendToWhatsApp({ type: "wc-preview-font", fontId: entry.id });
-    if (entry.id !== currentActiveId) {
-      if (!previewActive) previewStartedAt = Date.now();
-      previewActive = true;
+    if (!previewActive) previewStartedAt = Date.now();
+    previewActive = true;
+    previewId = entry.id;
+    markPreviewing(entry.id);
+    if (window.wcPreviewBar) {
+      window.wcPreviewBar.set("font", {
+        name: entry.name || entry.id,
+        onApply: () => applyFont(entry),
+        onRevert: () => revertPreview("explicit_cancel"),
+      });
     }
   }
 
-  // Stop showing an uncommitted preview and restore the committed font.
-  // `discarded:true` means the user browsed away without applying — a normal
-  // browsing signal that is logged as font_preview_discarded, kept SEPARATE
-  // from font_reset (the regret/revert signal). A revert/commit clears silently.
-  function clearFontPreview(opts) {
+  // Revert the live preview to the committed font. A `trigger` logs a categorised
+  // font_preview_discarded; a null trigger reverts silently (e.g. re-selecting
+  // the active font, reset, or popup close).
+  function revertPreview(trigger) {
     if (!previewActive) return;
-    previewActive = false;
     sendToWhatsApp({ type: "wc-preview-clear-font" });
-    if (opts && opts.discarded) {
-      const props = {};
-      if (previewStartedAt)
-        props.seconds_previewed = Math.max(0, Math.floor((Date.now() - previewStartedAt) / 1000));
-      track("font_preview_discarded", props);
-    }
+    if (trigger) logDiscard(trigger);
+    previewActive = false;
+    previewId = null;
     previewStartedAt = 0;
+    markPreviewing(null);
+    if (window.wcPreviewBar) window.wcPreviewBar.clear("font");
+  }
+
+  // Commit the previewed font. Clears preview state BEFORE the storage write so
+  // the storage.onChanged listener doesn't mistake our own commit for an
+  // external "applied_elsewhere" one.
+  function applyFont(entry) {
+    previewActive = false;
+    previewId = null;
+    previewStartedAt = 0;
+    currentActiveId = entry.id;
+    chrome.storage.local.set({
+      [ACTIVE_KEY]: { id: entry.id },
+      [APPLIED_AT_KEY]: Date.now(),
+    });
+    track("font_applied", {
+      font_id: globalThis.WA_SAFE_FONT_ID_FOR_ANALYTICS(entry),
+      source: entry.source === "preset" ? "preset" : "custom",
+    });
+    markPreviewing(null);
+    if (window.wcPreviewBar) window.wcPreviewBar.clear("font");
   }
 
   // Open the full Font Manager (fonts.html), optionally jumping to the editor.
@@ -93,7 +148,10 @@
     col.className = "col-6";
 
     const card = document.createElement("div");
-    card.className = "theme-card" + (entry.id === activeId ? " active" : "");
+    let cls = "theme-card";
+    if (entry.id === activeId) cls += " active";
+    else if (entry.id === previewId) cls += " previewing";
+    card.className = cls;
     card.dataset.id = entry.id;
     card.setAttribute("role", "button");
     card.tabIndex = 0;
@@ -123,32 +181,16 @@
     card.appendChild(tag);
     col.appendChild(card);
 
-    const apply = () => {
-      // Explicit commit. The committed state now equals what was being
-      // previewed, so the preview is no longer "uncommitted" (and is not a
-      // discard).
-      previewActive = false;
-      previewStartedAt = 0;
-      currentActiveId = entry.id;
-      chrome.storage.local.set({
-        [ACTIVE_KEY]: { id: entry.id },
-        [APPLIED_AT_KEY]: Date.now(),
-      });
-      track("font_applied", {
-        font_id: globalThis.WA_SAFE_FONT_ID_FOR_ANALYTICS(entry),
-        source: entry.source === "preset" ? "preset" : "custom",
-      });
-    };
-    card.addEventListener("click", apply);
+    // Click / Enter / Space = select + live-preview (not apply). Commit happens
+    // through the sticky Apply bar.
+    const select = () => selectFont(entry);
+    card.addEventListener("click", select);
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        apply();
+        select();
       }
     });
-    // Hover / keyboard-focus = live preview on WhatsApp without committing.
-    card.addEventListener("mouseenter", () => previewFont(entry));
-    card.addEventListener("focus", () => previewFont(entry));
     return col;
   }
 
@@ -180,6 +222,8 @@
         if (newBtn) newBtn.style.display = "";
         customs.forEach((f) => customsGrid.appendChild(buildCard(f, activeId)));
       }
+      // Keep the preview highlight through re-renders (custom list changes etc.).
+      markPreviewing(previewId);
     });
   }
 
@@ -215,9 +259,7 @@
     render();
 
     document.querySelectorAll("[data-fonts-subtab]").forEach((t) => {
-      t.addEventListener("click", () =>
-        switchSubtab(t.dataset.fontsSubtab, true)
-      );
+      t.addEventListener("click", () => switchSubtab(t.dataset.fontsSubtab, true));
     });
 
     const manage = document.getElementById("open-font-manager");
@@ -244,7 +286,7 @@
     const reset = document.getElementById("reset-font");
     if (reset)
       reset.addEventListener("click", () => {
-        clearFontPreview();
+        revertPreview(null); // drop any pending preview silently — this is a reset, not a discard
         chrome.storage.local.get([APPLIED_AT_KEY], (d) => {
           const appliedAt = Number(d[APPLIED_AT_KEY]) || 0;
           const props = { trigger: "manual_button" };
@@ -256,19 +298,22 @@
         });
       });
 
-    // Leaving the typography pane reverts any uncommitted hover-preview and
-    // logs it as a discard (browsing signal), NOT a reset.
-    const typoPane = document.getElementById("tab-typography");
-    if (typoPane)
-      typoPane.addEventListener("mouseleave", () => clearFontPreview({ discarded: true }));
-
-    // Popup closing with a preview still showing = browsed-and-discarded.
-    window.addEventListener("pagehide", () => clearFontPreview({ discarded: true }));
+    // Popup closing with a preview still showing: revert the live preview so we
+    // don't leave an uncommitted font on WhatsApp Web — but this is NOT a user
+    // discard, so it is not logged (the sticky bar was the unsaved-preview cue).
+    window.addEventListener("pagehide", () => {
+      if (previewActive) sendToWhatsApp({ type: "wc-preview-clear-font" });
+    });
 
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === "local" && (changes[ACTIVE_KEY] || changes[CUSTOM_KEY])) {
-        render();
+      if (area !== "local") return;
+      // A commit that landed from another surface while we were previewing.
+      if (changes[ACTIVE_KEY] && previewActive) {
+        const nv = changes[ACTIVE_KEY].newValue;
+        const newId = nv && nv.id;
+        if (newId !== previewId) revertPreview("applied_elsewhere");
       }
+      if (changes[ACTIVE_KEY] || changes[CUSTOM_KEY]) render();
     });
   });
 })();
