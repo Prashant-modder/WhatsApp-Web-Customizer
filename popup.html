@@ -34,6 +34,7 @@
         <script src="fonts.js" defer></script>
         <script src="animated-bg-popup.js" defer></script>
         <script src="animated-bg-hint.js" defer></script>
+        <script src="first-run-theme-picker.js" defer></script>
 
         <style>
             /* ---- Theme tokens ---- */
@@ -49,13 +50,18 @@
                 --wa-glow: 0 0 8px rgba(16, 185, 129, 0.3);
                 --bs-success: #10b981;
                 --bs-success-rgb: 16, 185, 129;
+                /* Fixed chrome font. The popup is extension chrome and must NEVER
+                   read the user font (--wc-user-font is deliberately not defined
+                   in this document), so it can't render in a pixel/script face. */
+                --wc-ui-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+                    Helvetica, Arial, sans-serif;
             }
 
             html,
             body {
                 background-color: var(--wa-bg);
                 color: var(--wa-text);
-                font-family: "Inter", sans-serif;
+                font-family: var(--wc-ui-font);
             }
 
             body {
@@ -375,6 +381,63 @@
                 text-transform: uppercase;
                 letter-spacing: 0.6px;
                 color: var(--wa-muted);
+            }
+
+            /* ---- First-run "Pick your look" overlay (first-run-theme-picker.js) ---- */
+            #onboarding-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.82);
+                z-index: 1051; /* above the image picker modal (1050) */
+                display: none; /* JS sets to flex when shown */
+                justify-content: center;
+                align-items: center;
+            }
+            #onboarding-overlay .onboarding-card {
+                background: var(--wa-surface);
+                border: 1px solid var(--wa-border);
+                border-radius: 14px;
+                width: min(560px, 92vw);
+                max-height: 92vh;
+                display: flex;
+                flex-direction: column;
+                padding: 22px;
+                box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+            }
+            #onboarding-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+                margin-top: 16px;
+            }
+            #onboarding-grid .onboarding-theme {
+                display: flex;
+                flex-direction: column;
+                border: 2px solid var(--wa-border);
+                border-radius: 10px;
+                overflow: hidden;
+                cursor: pointer;
+                background: var(--wa-surface-2);
+                transition: border-color 0.15s ease, box-shadow 0.15s ease,
+                    transform 0.1s ease;
+            }
+            #onboarding-grid .onboarding-theme:hover,
+            #onboarding-grid .onboarding-theme:focus-visible {
+                border-color: var(--wa-accent);
+                box-shadow: var(--wa-glow);
+                outline: none;
+                transform: translateY(-1px);
+            }
+            #onboarding-grid .onboarding-swatch {
+                height: 72px;
+                width: 100%;
+                display: flex;
+            }
+            #onboarding-grid .onboarding-name {
+                padding: 8px 10px;
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--wa-text);
             }
 
             /* ---- Image picker modal (kept as overlay; JS toggles display) ---- */
@@ -1317,15 +1380,17 @@
                                 <button id="open-theme-manager" type="button" class="btn btn-sm btn-outline-success">
                                     Manage Items
                                 </button>
-                                <button id="reset-theme" type="button" class="btn btn-sm btn-outline-secondary">
-                                    Reset
+                                <button id="reset-theme" type="button" class="btn btn-sm btn-outline-light" title="Revert WhatsApp to its default theme">
+                                    ↺ Revert to default
                                 </button>
                             </div>
                         </div>
                         <p class="text-secondary small mb-3">
-                            Click any theme below to apply it instantly. Use
-                            <strong>Manage Items</strong> to import your own,
-                            or <strong>Reset</strong> to revert to WhatsApp's default.
+                            <strong>Hover</strong> a theme to preview it live on
+                            WhatsApp; <strong>click</strong> to apply. Use
+                            <strong>Manage Items</strong> to import your own, or
+                            <strong>↺ Revert to default</strong> to go back to
+                            WhatsApp's default at any time.
                         </p>
 
                         <!-- Anti-reset "save your look" nudge. Hidden by default;
@@ -1429,15 +1494,16 @@
                                 <button id="open-font-manager" type="button" class="btn btn-sm btn-outline-success">
                                     Manage Fonts
                                 </button>
-                                <button id="reset-font" type="button" class="btn btn-sm btn-outline-secondary">
-                                    Reset
+                                <button id="reset-font" type="button" class="btn btn-sm btn-outline-light" title="Revert WhatsApp to its default font">
+                                    ↺ Revert to default
                                 </button>
                             </div>
                         </div>
                         <p class="ts-hint">
-                            Click any font below to apply it instantly. Use Manage Fonts to
-                            upload your own or load one from a URL, or Reset to revert to
-                            WhatsApp's default.
+                            <strong>Hover</strong> a font to preview it live on WhatsApp;
+                            <strong>click</strong> to apply. Use Manage Fonts to upload your
+                            own or load one from a URL, or <strong>↺ Revert to default</strong>
+                            to go back to WhatsApp's default at any time.
                         </p>
 
                         <!-- Presets vs Custom — same .bg-subtabs/.bg-subtab pattern as Themes. -->
@@ -1695,6 +1761,20 @@
             <div class="modal-card">
                 <h3 id="modal-title" class="h6 m-0">Image Selection</h3>
                 <div id="modal-gallery"></div>
+                <div
+                    id="modal-error"
+                    role="alert"
+                    style="
+                        display: none;
+                        color: #ff6b6b;
+                        background: rgba(255, 107, 107, 0.1);
+                        border: 1px solid rgba(255, 107, 107, 0.35);
+                        border-radius: 8px;
+                        padding: 8px 10px;
+                        margin-top: 10px;
+                        font-size: 13px;
+                    "
+                ></div>
                 <div class="d-flex flex-wrap gap-2 mt-3">
                     <button id="modal-upload" type="button" class="btn btn-sm btn-success flex-fill">
                         Manage Images
@@ -1707,6 +1787,51 @@
                     </button>
                     <button id="modal-cancel" type="button" class="btn btn-sm btn-outline-secondary flex-fill">
                         Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- First-run "Pick your look" overlay. Shown once on the first popup
+             open after a fresh install (gated on onboarding_pending /
+             has_seen_onboarding by first-run-theme-picker.js). Cards are built in
+             JS from the presets. Instantly dismissible; never blocks usage. -->
+        <div
+            id="onboarding-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="onboarding-title"
+        >
+            <div class="onboarding-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <h3 id="onboarding-title" class="h5 m-0">Pick your look</h3>
+                        <p
+                            class="mb-0 mt-1"
+                            style="color: var(--wa-muted); font-size: 13px"
+                        >
+                            One tap applies a theme to WhatsApp Web. You can change
+                            or reset it anytime.
+                        </p>
+                    </div>
+                    <button
+                        id="onboarding-close"
+                        type="button"
+                        class="btn btn-sm btn-link text-decoration-none"
+                        style="color: var(--wa-muted)"
+                        aria-label="Close"
+                    >
+                        ✕
+                    </button>
+                </div>
+                <div id="onboarding-grid"></div>
+                <div class="d-flex justify-content-end mt-3">
+                    <button
+                        id="onboarding-skip"
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                    >
+                        Maybe later
                     </button>
                 </div>
             </div>
