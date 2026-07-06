@@ -67,12 +67,20 @@
 
   /* ── uninstall tracking ──────────────────────────────────────────────── */
 
+  // The uninstall redirect page needs OUR distinct_id so the extension_uninstalled
+  // event it fires is linkable to the same user PostHog already knows — otherwise
+  // churn analysis is impossible (the 14-day export had 110 uninstall events, none
+  // matching a known user). We await getOrCreateUserId() so the id is guaranteed
+  // present before the URL is set, and pass it as `did` plus the extension version
+  // as `v`. The id is stable, so re-setting on onInstalled/onStartup is idempotent.
   async function setupUninstallTracking() {
     try {
       if (!chrome.runtime || typeof chrome.runtime.setUninstallURL !== "function") return;
       var id = await getOrCreateUserId();
+      var version = chrome.runtime.getManifest().version;
       var url = new URL("https://olivierluethy.github.io/WhatsApp-Web-Pages/uninstall.html");
-      url.searchParams.set("entry.1444409856", id);
+      url.searchParams.set("did", id); // PostHog distinct_id — links the uninstall to the user
+      url.searchParams.set("v", version); // extension version at uninstall time
       await chrome.runtime.setUninstallURL(url.toString());
     } catch (err) {
       console.warn("[analytics] setupUninstallTracking failed:", err && err.message);
