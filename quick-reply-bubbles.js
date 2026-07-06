@@ -39,7 +39,8 @@ function fireBubblesSessionSummary() {
     bubbles_inserted_count: sessionBubblesInsertedCount,
   });
 }
-window.addEventListener("pagehide", fireBubblesSessionSummary);
+// pagehide is wired in initQuickReplies() (not at load) so a disabled feature
+// registers no listeners at all.
 
 function ensureStyles() {
   if (document.getElementById("qr-bubble-styles")) return;
@@ -142,19 +143,21 @@ function scheduleReconcile() {
   }, DEBOUNCE_MS);
 }
 
+let qrObserver = null;
+
 function observeDOMForQuickReplies() {
   // Scope to the stable app root rather than document.body. subtree is still
   // needed to see the footer mount deep in the tree, but per-mutation work is
   // now just scheduleReconcile()'s early-return check.
   const target = document.getElementById("app") || document.body;
-  new MutationObserver(scheduleReconcile).observe(target, {
-    childList: true,
-    subtree: true,
-  });
+  qrObserver = new MutationObserver(scheduleReconcile);
+  qrObserver.observe(target, { childList: true, subtree: true });
   scheduleReconcile();
 }
 
-chrome.storage.onChanged.addListener((changes, area) => {
+// Reacts to edits of the user's saved replies while the feature is ON. Named so
+// teardown can remove it; only registered by initQuickReplies().
+function onQuickRepliesContentChanged(changes, area) {
   if (area !== "local" || !changes.quickReplies) return;
   const replies = Array.isArray(changes.quickReplies.newValue)
     ? changes.quickReplies.newValue
@@ -176,6 +179,61 @@ chrome.storage.onChanged.addListener((changes, area) => {
     // it as a show.
     scheduleReconcile();
   }
+}
+
+/* ── lazy activation ─────────────────────────────────────────────────────
+ * The feature is opt-in (default OFF as of 1.1.18). When OFF, the ONLY cost on
+ * a WhatsApp Web load is the single boolean read below plus one passive flag
+ * watcher — no MutationObserver, no DOM queries, no timers, no per-reply
+ * listeners. Everything expensive lives inside initQuickReplies(), which runs
+ * only once the toggle is ON (live, no page reload needed).
+ */
+const QR_ENABLED_KEY = "quickRepliesEnabled";
+let qrInitialized = false;
+
+function initQuickReplies() {
+  if (qrInitialized) return;
+  qrInitialized = true;
+  window.addEventListener("pagehide", fireBubblesSessionSummary);
+  chrome.storage.onChanged.addListener(onQuickRepliesContentChanged);
+  observeDOMForQuickReplies();
+}
+
+function teardownQuickReplies() {
+  if (!qrInitialized) return;
+  qrInitialized = false;
+  // Flush the session summary for the run we're ending, then unwire everything.
+  fireBubblesSessionSummary();
+  if (qrObserver) {
+    qrObserver.disconnect();
+    qrObserver = null;
+  }
+  if (reconcileTimer) {
+    clearTimeout(reconcileTimer);
+    reconcileTimer = null;
+  }
+  window.removeEventListener("pagehide", fireBubblesSessionSummary);
+  chrome.storage.onChanged.removeListener(onQuickRepliesContentChanged);
+  // Actually remove injected DOM (teardown, not just hide).
+  const existing = document.getElementById("quick-reply-bubbles");
+  if (existing) existing.remove();
+  const styles = document.getElementById("qr-bubble-styles");
+  if (styles) styles.remove();
+  bubblesVisible = false;
+  // Allow a fresh session summary if the feature is turned back on this load.
+  sessionEventFired = false;
+}
+
+// Bootstrap: one storage read decides whether to initialise.
+chrome.storage.local.get([QR_ENABLED_KEY], (data) => {
+  if (data[QR_ENABLED_KEY] === true) initQuickReplies();
 });
 
-observeDOMForQuickReplies();
+// Passive flag watcher: activates/deactivates the feature live when the popup
+// toggle flips. This fires only on a settings write — never on WhatsApp's DOM
+// mutation path — so it is free during normal browsing.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes[QR_ENABLED_KEY]) return;
+  if (changes[QR_ENABLED_KEY].newValue === true) initQuickReplies();
+  else teardownQuickReplies();
+});

@@ -72,11 +72,14 @@ After cutover, consumers should query the canonical name only. The PR that remov
 - **Trigger:** `flush()` catches an error sending to PostHog.
 - **Properties:**
   - `error_class` *(enum)* — `"http_error" | "network_error" | "unknown"`.
-  - `endpoint_status` *(number | null)* — HTTP status code if available (e.g. `503`), `null` for non-HTTP failures.
+  - `error_name` *(string | null)* — the JS error class (e.g. `"TypeError"`), or `null`. Distinguishes network-stack errors from API rejections at a finer grain than `error_class`.
+  - `endpoint_status` *(number | null)* — HTTP status code if available (e.g. `503`), `null` for non-HTTP failures. (This is the "http_status" for analysis.)
   - `batch_size` *(number)* — how many events were in the failed batch.
+  - `queue_depth` *(number)* — events still queued after this attempt's retry-cap drops.
   - `dropped_failure_reports` *(number, optional)* — present only when the bounded self-telemetry queue overflowed since the previous report. Counts events we couldn't keep.
+  - `reason` *(string)* — mirrors `error_class` (explicit diagnostic field).
   - `status` *(string)* — **DEPRECATED**, mirrors `error_class`.
-- **Pipeline.** This event does NOT go through the main queue. It rides a dedicated in-memory pipe with a bounded queue (10 events per service-worker lifetime) so a delivery storm cannot amplify itself. If the dedicated pipe itself fails, the event is dropped silently (recursion gate). See `analytics.js` `reportFlushFailure()` and `flushSelfTelemetry()`.
+- **Pipeline.** This event does NOT go through the main queue. It rides a dedicated in-memory pipe with a bounded queue (10 events per service-worker lifetime) so a delivery storm cannot amplify itself. If the dedicated pipe itself fails, the event is dropped silently (recursion gate). See `analytics.js` `reportFlushFailure()` and `flushSelfTelemetry()`. **`analytics_circuit_opened` and the failure-path `analytics_events_dropped` (`reason: "max_attempts_exceeded"`) ride the same pipe** for the same reason. (The healthy-path `analytics_events_dropped` with `reason: "queue_overflow"` is emitted after a *successful* flush, so it safely uses the main queue.)
 
 ### Options page
 
@@ -536,6 +539,12 @@ After cutover, consumers should query the canonical name only. The PR that remov
 
 ### Quick Replies (popup + WA Web)
 
+#### `quick_replies_enabled_toggled`
+- **Q:** What is the opt-in rate for quick reply bubbles? As of 1.1.18 the feature is opt-in (default OFF) and lazy-loaded — the WA-Web observer/DOM cost is paid only by users who enable it. This event measures adoption of the toggle going forward.
+- **Trigger:** User flips the "Enable quick reply bubbles" switch at the top of the Replies tab (`quick-replies.js`).
+- **Properties:**
+  - `enabled` *(boolean)* — new toggle state (`true` = feature turned on).
+
 #### `quick_replies_preview_seen`
 *Listed under Popup navigation above.*
 
@@ -626,7 +635,7 @@ The following moments are explicitly NOT tracked. Each has been considered and r
 
 - **PostHog project setting:** IP geolocation disabled at the project level. The extension does not send IP-derived properties.
 - **Distinct ID lifecycle:** generated once on first install. Survives extension updates. Cleared only if the user wipes extension storage or uninstalls. The same id is appended to the uninstall feedback URL (below).
-- **Uninstall feedback:** `chrome.runtime.setUninstallURL()` (registered by `setupUninstallTracking()` in `analytics.js`, called on `onInstalled` and `onStartup`) opens a Google Form when the extension is removed, with the anonymous `analytics_distinct_id` appended as `userId`. Chrome runs no extension code after removal, so the page-open itself is **not** captured client-side — there is no `uninstall_page_opened` event. Uninstall responses are joined back to the PostHog person via the `userId` field in the form export. To record `userId` as a form *response field* (not just a URL param), set `UNINSTALL_FORM_USERID_PARAM` in `analytics.js` to the form's prefill `entry.<id>` token. A future self-hosted redirect page could fire `uninstall_page_opened` before forwarding to the form; not built today.
+- **Uninstall feedback (`extension_uninstalled`):** `chrome.runtime.setUninstallURL()` (registered by `setupUninstallTracking()` in `analytics.js`, called on `onInstalled` and `onStartup`) points at a redirect page hosted in a **separate** repo (`olivierluethy.github.io/WhatsApp-Web-Pages/uninstall.html`; a reference copy lives at `uninstall.html` in this repo). As of 1.1.18 the URL carries `?did=<analytics_distinct_id>&v=<version>`. The redirect page reads `did`, fires `extension_uninstalled` to PostHog with `distinct_id` set to that id (so the event is **linkable to the same person** PostHog already knows — the prior scheme lost this, producing uninstall events under anonymous ids), then forwards to a Google Form with the id pre-filled into the `entry.1444409856` field. Chrome runs no extension code after removal, so the page-open is captured by the *page*, not the extension. **The hosted page must be deployed from the separate repo whenever this contract changes** — updating the in-repo copy alone does nothing. Legacy `entry.1444409856` param is still read as a fallback for URLs set by versions <1.1.18. `extension_uninstalled` properties: `$lib: "chrome-extension-uninstall-redirect"`, `source: "uninstall_redirect"`, `extension_version` (from `v`, may be null for legacy URLs).
 - **No opt-out toggle today.** Disclosure runs through the privacy policy and the options page (which surfaces the distinct ID for deletion requests). See `options.html` for the user-visible language.
 - **Service worker teardown:** events queued via `track.js` are forwarded to the SW via `chrome.runtime.sendMessage`; if the SW is torn down, the message is delivered on its next wake. Events captured in the popup, options page, and content scripts therefore tolerate SW lifecycle gaps.
 
