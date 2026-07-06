@@ -536,6 +536,12 @@ After cutover, consumers should query the canonical name only. The PR that remov
 
 ### Quick Replies (popup + WA Web)
 
+#### `quick_replies_enabled_toggled`
+- **Q:** What is the opt-in rate for quick reply bubbles? As of 1.1.18 the feature is opt-in (default OFF) and lazy-loaded — the WA-Web observer/DOM cost is paid only by users who enable it. This event measures adoption of the toggle going forward.
+- **Trigger:** User flips the "Enable quick reply bubbles" switch at the top of the Replies tab (`quick-replies.js`).
+- **Properties:**
+  - `enabled` *(boolean)* — new toggle state (`true` = feature turned on).
+
 #### `quick_replies_preview_seen`
 *Listed under Popup navigation above.*
 

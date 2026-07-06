@@ -1655,6 +1655,24 @@
                             Save the messages you type most. They appear as one-tap bubbles above WhatsApp Web's input.
                         </p>
 
+                        <!-- Enable/disable switch. The feature is opt-in: when off,
+                             the content script runs no observer or DOM work at all.
+                             Toggling this activates/deactivates bubbles live. -->
+                        <div class="form-check form-switch mb-3">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                id="qr-enabled-toggle"
+                            />
+                            <label class="form-check-label small fw-semibold" for="qr-enabled-toggle">
+                                Enable quick reply bubbles
+                            </label>
+                            <div class="form-text small">
+                                Off by default. Turn on to show one-tap reply bubbles above WhatsApp Web's message box.
+                            </div>
+                        </div>
+
                         <!-- Visual preview: shows users *where* the bubbles appear and
                              *how* they look in WhatsApp Web before they create one.
                              Pure CSS — no images, no JS. Each bubble's gradient mirrors

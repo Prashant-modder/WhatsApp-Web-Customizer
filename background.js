@@ -23,6 +23,31 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
+// Quick Reply lazy-load migration (one-time). Only 2.4% of users ever add a
+// quick reply, yet the feature's MutationObserver ran for 100% of loads. The new
+// default is OFF, but existing users must not notice the change: anyone with at
+// least one saved reply — or a prior explicit enable — keeps the feature ON.
+//
+// Keyed on a persisted flag so it computes the enable state exactly once, never
+// on later loads. After migration the toggle is fully user-controlled and the
+// content script pays only a single boolean read per load.
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    const ENABLED_KEY = "quickRepliesEnabled";
+    const MIGRATED_KEY = "qr_enabled_migrated";
+    const data = await chrome.storage.local.get([ENABLED_KEY, MIGRATED_KEY, "quickReplies"]);
+    if (data[MIGRATED_KEY]) return; // already decided — do not recompute
+    const hasReplies = Array.isArray(data.quickReplies) && data.quickReplies.length > 0;
+    const explicitlyEnabled = data[ENABLED_KEY] === true;
+    await chrome.storage.local.set({
+      [ENABLED_KEY]: hasReplies || explicitlyEnabled,
+      [MIGRATED_KEY]: true,
+    });
+  } catch (err) {
+    console.warn("[quick-reply] enable migration failed:", err && err.message);
+  }
+});
+
 // The uninstall feedback URL (with the anonymous userId appended) is
 // registered by setupUninstallTracking(), which initAnalytics() wires to
 // onInstalled (install/update) and onStartup (browser launch). The
