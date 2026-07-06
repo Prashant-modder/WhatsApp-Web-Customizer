@@ -40,6 +40,7 @@
   var BACKOFF_CAP_MS = 5 * 60 * 1000; // ~5 min ceiling
   var CIRCUIT_THRESHOLD = 5; // consecutive failures before opening
   var CIRCUIT_COOLDOWN_MS = 10 * 60 * 1000; // pause flushing while open
+  var SELF_TELEMETRY_CAP = 10; // resilience-layer events kept per SW lifetime
 
   function newId() {
     return crypto.randomUUID();
@@ -191,6 +192,82 @@
     return Math.max(BACKOFF_BASE_MS, Math.round(jittered));
   }
 
+  /* ── self-telemetry pipe (resilience-layer events) ───────────────────────
+   * The resilience layer's OWN events (analytics_flush_failed,
+   * analytics_circuit_opened, and failure-path analytics_events_dropped) must
+   * NOT ride the main queue. If they did, an endpoint outage would feed itself:
+   * every failed flush would append a flush_failed event, which keeps the queue
+   * non-empty, which triggers another flush, which fails and appends again —
+   * amplifying the very failure storm we're trying to measure (and evicting
+   * real user events at the 200-cap). A 14-day export showing 2,001
+   * analytics_flush_failed (5.2% of all events) is the signature of that loop.
+   *
+   * Instead these events ride a dedicated, in-memory, bounded pipe:
+   *   - in-memory (best-effort; lost on SW teardown — fine for diagnostics),
+   *   - bounded to SELF_TELEMETRY_CAP events per service-worker lifetime,
+   *   - recursion-gated: flushSelfTelemetry() NEVER reports its own failures,
+   *     so a delivery storm here cannot amplify itself.
+   * Overflowed reports are counted and surfaced as `dropped_failure_reports`
+   * on the next successful self-telemetry batch.
+   */
+  var selfTelemetryQueue = [];
+  var selfTelemetryDropped = 0; // reports lost to the cap since the last success
+  var selfTelemetryInFlight = false;
+
+  async function reportFlushFailure(event, props) {
+    try {
+      var id = await getOrCreateUserId();
+      if (selfTelemetryQueue.length >= SELF_TELEMETRY_CAP) {
+        selfTelemetryDropped++; // surfaced as dropped_failure_reports later
+        return;
+      }
+      var manifest = chrome.runtime.getManifest();
+      selfTelemetryQueue.push({
+        event: event,
+        properties: {
+          ...props,
+          distinct_id: id,
+          $insert_id: newId(),
+          $lib: "chrome-extension",
+          extension_version: manifest.version,
+        },
+        timestamp: new Date().toISOString(),
+      });
+      await flushSelfTelemetry();
+    } catch (err) {
+      /* best-effort — self-telemetry must never throw into the flush path */
+    }
+  }
+
+  async function flushSelfTelemetry() {
+    // Recursion gate: this path calls neither onFlushFailure nor
+    // reportFlushFailure. On ANY error it drops silently, so it cannot amplify.
+    if (selfTelemetryInFlight || selfTelemetryQueue.length === 0) return;
+    selfTelemetryInFlight = true;
+    var batch = selfTelemetryQueue.slice(0, SELF_TELEMETRY_CAP);
+    if (selfTelemetryDropped > 0)
+      batch[batch.length - 1].properties.dropped_failure_reports = selfTelemetryDropped;
+    var payload = { api_key: API_KEY, batch: batch.map(toPosthog) };
+    try {
+      var resp = await fetch(`${HOST}/batch/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      });
+      if (resp.ok) {
+        selfTelemetryQueue = selfTelemetryQueue.slice(batch.length);
+        selfTelemetryDropped = 0;
+      }
+      // On !resp.ok leave the queue for the next failure episode — but do NOT
+      // report (recursion gate). The cap bounds unbounded growth.
+    } catch (err) {
+      /* drop silently — recursion gate */
+    } finally {
+      selfTelemetryInFlight = false;
+    }
+  }
+
   /* ── flush ───────────────────────────────────────────────────────────── */
 
   async function onFlushSuccess(sentBatch) {
@@ -252,34 +329,38 @@
 
     console.warn("[analytics] flush failed, backing off:", err && err.message, "fails=" + fails);
 
+    // The three notices below ride the dedicated self-telemetry pipe, NOT the
+    // main queue — see reportFlushFailure(). This is what stops a failure storm
+    // from feeding itself.
+
     // 3. Aggregated drop count (count only, no PII).
     var failReason = classifyError(err);
     if (dropped > 0)
-      await enqueueInternal("analytics_events_dropped", {
+      await reportFlushFailure("analytics_events_dropped", {
         count: dropped,
         reason: "max_attempts_exceeded",
         batch_size: batchLen,
         queue_depth: survivors.length,
       });
 
-    // 4. Best-effort circuit-open notice (queued, respects the breaker).
+    // 4. Best-effort circuit-open notice.
     if (openedNow) {
-      await enqueueInternal("analytics_circuit_opened", {
+      await reportFlushFailure("analytics_circuit_opened", {
         consecutive_failures: fails,
         endpoint_status: typeof status === "number" ? status : null,
         hard_blocked: hardBlocked,
       });
     }
 
-    // 5. One bounded failure report per attempt. Attempts are now rate-limited
-    //    by backoff/circuit, so this volume falls sharply versus the old
-    //    every-30s loop.
+    // 5. One bounded failure report per attempt. Attempts are rate-limited by
+    //    backoff/circuit, and the pipe is capped, so this volume stays low.
     var cls = failReason;
-    await enqueueInternal("analytics_flush_failed", {
-      status: cls, // kept for analytics continuity (pre-existing key)
-      error_class: cls, // kept for analytics continuity (pre-existing key)
-      reason: cls, // brief Task 3: explicit diagnostic field
-      endpoint_status: typeof status === "number" ? status : null,
+    await reportFlushFailure("analytics_flush_failed", {
+      status: cls, // DEPRECATED, mirrors error_class (pre-existing key)
+      error_class: cls, // canonical enum
+      reason: cls, // explicit diagnostic field
+      error_name: err && err.name ? String(err.name) : null, // JS error class, e.g. "TypeError"
+      endpoint_status: typeof status === "number" ? status : null, // HTTP status (a.k.a. http_status)
       batch_size: batchLen,
       queue_depth: survivors.length,
     });

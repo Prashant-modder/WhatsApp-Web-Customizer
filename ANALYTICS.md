@@ -72,11 +72,14 @@ After cutover, consumers should query the canonical name only. The PR that remov
 - **Trigger:** `flush()` catches an error sending to PostHog.
 - **Properties:**
   - `error_class` *(enum)* — `"http_error" | "network_error" | "unknown"`.
-  - `endpoint_status` *(number | null)* — HTTP status code if available (e.g. `503`), `null` for non-HTTP failures.
+  - `error_name` *(string | null)* — the JS error class (e.g. `"TypeError"`), or `null`. Distinguishes network-stack errors from API rejections at a finer grain than `error_class`.
+  - `endpoint_status` *(number | null)* — HTTP status code if available (e.g. `503`), `null` for non-HTTP failures. (This is the "http_status" for analysis.)
   - `batch_size` *(number)* — how many events were in the failed batch.
+  - `queue_depth` *(number)* — events still queued after this attempt's retry-cap drops.
   - `dropped_failure_reports` *(number, optional)* — present only when the bounded self-telemetry queue overflowed since the previous report. Counts events we couldn't keep.
+  - `reason` *(string)* — mirrors `error_class` (explicit diagnostic field).
   - `status` *(string)* — **DEPRECATED**, mirrors `error_class`.
-- **Pipeline.** This event does NOT go through the main queue. It rides a dedicated in-memory pipe with a bounded queue (10 events per service-worker lifetime) so a delivery storm cannot amplify itself. If the dedicated pipe itself fails, the event is dropped silently (recursion gate). See `analytics.js` `reportFlushFailure()` and `flushSelfTelemetry()`.
+- **Pipeline.** This event does NOT go through the main queue. It rides a dedicated in-memory pipe with a bounded queue (10 events per service-worker lifetime) so a delivery storm cannot amplify itself. If the dedicated pipe itself fails, the event is dropped silently (recursion gate). See `analytics.js` `reportFlushFailure()` and `flushSelfTelemetry()`. **`analytics_circuit_opened` and the failure-path `analytics_events_dropped` (`reason: "max_attempts_exceeded"`) ride the same pipe** for the same reason. (The healthy-path `analytics_events_dropped` with `reason: "queue_overflow"` is emitted after a *successful* flush, so it safely uses the main queue.)
 
 ### Options page
 
