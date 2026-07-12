@@ -1,5 +1,40 @@
 # Release Notes
 
+## 1.2.0 — Remove Quick Replies; lead with Privacy
+
+**Why:** only 2.6% of users (19/730) ever created/edited/deleted a quick reply,
+and the 225 `quick_replies_preview_seen` events were passive impressions, not
+intent. It was also the heaviest content-script surface (reply-bubble injection
+plus a MutationObserver on WhatsApp's composer), so removing it is the single
+biggest performance win.
+
+- **Removed Quick Replies completely** (`refactor!`): the popup tab + panel,
+  the reply-bubble content script and its MutationObserver/reconcile loop, all
+  `.qr-*` styles, the UI-scope allowlist entries, and every Quick Replies
+  PostHog event (`quick_replies_preview_seen`, `quick_replies_enabled_toggled`,
+  `quick_reply_added/_edited/_deleted/_first_added`, `quick_reply_bubbles_shown/
+  _session`, `quick_reply_inserted`) plus the `qr_count` property snapshots.
+  A one-time `background.js` cleanup clears `quickReplies`, `quickRepliesEnabled`,
+  `qr_enabled_migrated` and `qr_first_added_at` on install/update so existing
+  users are left no dead data in `chrome.storage`.
+- **Renamed to lead with Privacy** (`feat`): the extension name and store copy
+  dropped "Quick Reply Bubbles" in favour of "… Themes, Fonts, Backgrounds &
+  Privacy", mapping to the well-used blur/hide features and to high-volume
+  Search Console queries ("read without showing blue ticks", "blur names").
+  The description now mentions "font size" for the searched term "how to
+  increase font size in whatsapp web". Version bumped 1.1.18 → 1.2.0.
+- **Discoverability** (`feat`): the Font size control is promoted to a labelled,
+  accented block at the top of the Typography panel (was buried under the font
+  grid); the "Animated" backgrounds subtab gets a persistent subtle accent so it
+  stays noticeable after the capped hint retires. The hint itself is unchanged.
+- **Display toggles** (`feat`): all kept; the lowest-reach one (`hide_recording`,
+  3.3%) moved under an "Advanced" divider to de-clutter the privacy list.
+- **Analytics reliability (Task 5):** verified already in place — `analytics.js`
+  has exponential backoff + jitter, a circuit breaker, a per-event retry cap
+  (`MAX_ATTEMPTS`), and a bounded 200-event queue, with self-telemetry on a
+  separate pipe so failures can't self-amplify. No rebuild needed; watch
+  `analytics_flush_failed` in the next PostHog pull.
+
 ## First-run activation: analytics reliability, onboarding, preview redesign, background fixes
 
 **Goal:** cut first-run churn. PostHog showed a ~12-minute median time-to-uninstall —
