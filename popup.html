@@ -176,6 +176,17 @@
                 background: var(--wa-accent);
                 color: #fff;
             }
+            /* Persistent subtle accent on the "Animated" label so it stays
+               discoverable even after the capped hint (badge + pulse) has been
+               shown its 3 times or dismissed. Inactive state only — the active
+               pill keeps its solid accent fill. */
+            .bg-subtab[data-bg-subtab="bg-animated"]:not(.active) {
+                color: var(--wa-accent);
+                font-weight: 600;
+            }
+            .bg-subtab[data-bg-subtab="bg-animated"]:not(.active):hover {
+                color: var(--wa-accent-hover);
+            }
 
             /* ---- Animated sub-tab discoverability nudge ---- */
             .bg-subtab-badge {
@@ -632,8 +643,8 @@
 
             /* ── Font cards (reuse .theme-card; preview text in the swatch) ──
                The font grid can grow long, so it scrolls inside a capped box
-               (.font-grid-scroll) which keeps the Font size control below it
-               reachable without scrolling the whole tab. */
+               (.font-grid-scroll) which keeps the toolbar and the promoted
+               Font size control above it reachable without scrolling the tab. */
             .font-swatch {
                 display: flex;
                 align-items: center;
@@ -886,6 +897,23 @@
                 border: 1px solid var(--ts-border);
                 border-radius: 12px;
                 padding: 16px;
+            }
+            /* Promoted variant at the top of the panel: accent border + spine so
+               the control reads as a first-class action, not a buried extra. */
+            #tab-typography .ts-size-block--promoted {
+                border-color: var(--ts-accent);
+                box-shadow: inset 3px 0 0 var(--ts-accent);
+                margin-bottom: 20px;
+            }
+            #tab-typography .ts-size-head {
+                display: flex;
+                align-items: baseline;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            #tab-typography .ts-size-sub {
+                font-size: 12px;
+                color: var(--ts-muted);
             }
             #tab-typography .ts-size-row {
                 display: flex;
@@ -1433,6 +1461,45 @@
                             to go back to WhatsApp's default at any time.
                         </p>
 
+                        <!-- Font size: promoted to the top of the panel for
+                             discoverability. Only ~5.5% of users found this when it
+                             was buried under the font grid, yet those who do adjust it
+                             repeatedly (~6 changes each). Inline control, never a modal. -->
+                        <div class="ts-size-block ts-size-block--promoted">
+                            <div class="ts-size-head">
+                                <h2 class="section-label m-0">Font size</h2>
+                                <span class="ts-size-sub">Make WhatsApp Web's text bigger or smaller</span>
+                            </div>
+                            <div class="ts-size-row">
+                                <input
+                                    type="range"
+                                    id="font-scale-slider"
+                                    class="form-range"
+                                    min="0.5"
+                                    max="1.5"
+                                    step="0.05"
+                                    value="1"
+                                />
+                                <input
+                                    type="number"
+                                    id="scale-percent-input"
+                                    class="form-control form-control-sm"
+                                    min="50"
+                                    max="150"
+                                    step="1"
+                                    value="100"
+                                />
+                                <span class="text-secondary small">%</span>
+                                <button
+                                    id="reset-scale"
+                                    type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Presets vs Custom — same .bg-subtabs/.bg-subtab pattern as Themes. -->
                         <div class="bg-subtabs d-flex mb-3" role="tablist">
                             <button
@@ -1454,8 +1521,8 @@
                         </div>
 
                         <!-- Capped, internally-scrolling grid: however many fonts the
-                             user adds, the Font size control below stays reachable
-                             without scrolling the whole tab. -->
+                             user adds, the grid scrolls internally so the toolbar and
+                             the Font size control above stay reachable. -->
                         <div class="font-grid-scroll">
                             <div class="bg-subpane" id="fonts-presets" role="tabpanel">
                                 <div class="row g-2" id="font-presets-grid"></div>
@@ -1493,37 +1560,6 @@
                             </div>
                         </div>
 
-                        <div class="ts-size-block">
-                            <h2 class="section-label">Font size</h2>
-                            <div class="ts-size-row">
-                                <input
-                                    type="range"
-                                    id="font-scale-slider"
-                                    class="form-range"
-                                    min="0.5"
-                                    max="1.5"
-                                    step="0.05"
-                                    value="1"
-                                />
-                                <input
-                                    type="number"
-                                    id="scale-percent-input"
-                                    class="form-control form-control-sm"
-                                    min="50"
-                                    max="150"
-                                    step="1"
-                                    value="100"
-                                />
-                                <span class="text-secondary small">%</span>
-                                <button
-                                    id="reset-scale"
-                                    type="button"
-                                    class="btn btn-sm btn-outline-secondary"
-                                >
-                                    Reset
-                                </button>
-                            </div>
-                        </div>
                     </section>
 
                     <!-- ─────── ABOUT ─────── -->
