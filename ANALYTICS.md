@@ -4,7 +4,7 @@ Single source of truth for every PostHog event this extension emits.
 
 - **Transport.** `window.track(eventName, properties)` in `track.js` forwards every event to the service worker (`analytics.js`), which batches and flushes every 30 seconds.
 - **Identity.** A random UUID generated on first install (`analytics_distinct_id` in `chrome.storage.local`). No email, phone, or WhatsApp identity.
-- **Privacy contract.** Property values are fixed enums, counts, durations, or extension-internal IDs (preset IDs, animation registry IDs, checkbox names from `popup.html`). **Zero user-entered text** — never theme names, never quick-reply text, never message/chat content, never file paths beyond extensions, never URLs. The contract is enforced by callers; the privacy policy and the options page disclose its existence.
+- **Privacy contract.** Property values are fixed enums, counts, durations, or extension-internal IDs (preset IDs, animation registry IDs, checkbox names from `popup.html`). **Zero user-entered text** — never theme names, never message/chat content, never file paths beyond extensions, never URLs. The contract is enforced by callers; the privacy policy and the options page disclose its existence.
 - **Theme IDs** pass through `WA_SAFE_THEME_ID_FOR_ANALYTICS()` (in `themes-presets.js`), which collapses legacy name-slugged custom IDs to the literal `"custom-legacy"`. Preset and new-format custom IDs pass through unchanged.
 - **Font IDs** pass through `WA_SAFE_FONT_ID_FOR_ANALYTICS()` (in `fonts-presets.js`), the exact analogue for the Fonts feature. It maps `preset-*` and new-format `custom-*` IDs through unchanged and collapses anything else to `"custom-legacy"`. Font *family names*, *URLs*, and *file names* are user-entered text and are NEVER emitted — only IDs, counts, enums, and file sizes.
 
@@ -60,7 +60,7 @@ After cutover, consumers should query the canonical name only. The PR that remov
 #### `whatsapp_web_loaded`
 - **Q:** Which extension features are active on a real WhatsApp Web load? Baseline for engagement ratios.
 - **Trigger:** `content.js` after WhatsApp Web's main UI has rendered.
-- **Properties:** Feature-flag snapshot derived from `chrome.storage.local` (presence of theme, slot images, font, scale, privacy mode, quick replies, visibility tweaks, animated background). All booleans / fixed-enum IDs.
+- **Properties:** Feature-flag snapshot derived from `chrome.storage.local` (presence of theme, slot images, font, scale, privacy mode, visibility tweaks, animated background). All booleans / fixed-enum IDs.
 
 #### `popup_opened`
 - **Q:** Which features are configured at the moment the popup opens? Population-level snapshot.
@@ -101,19 +101,15 @@ After cutover, consumers should query the canonical name only. The PR that remov
 - **Q:** Which tabs do users move between? Where do they stop?
 - **Trigger:** Top-level pill nav click in `popup.html` (handler in `popup-nav.js`).
 - **Properties:**
-  - `from_tab` *(enum)* — `"tab-display" | "tab-backgrounds" | "tab-themes" | "tab-typography" | "tab-replies" | "tab-about"`.
+  - `from_tab` *(enum)* — `"tab-display" | "tab-backgrounds" | "tab-themes" | "tab-typography" | "tab-about"`.
   - `to_tab` *(same enum)*.
-
-#### `quick_replies_preview_seen`
-- **Q:** What share of popup sessions ever surface the quick-replies preview?
-- **Trigger:** First time the Replies tab activates in a popup session (deduplicated per session).
 
 #### `backgrounds_tab_opened`
 - **Q:** What share of popup sessions ever surface the Backgrounds tab?
 - **Trigger:** First time the Backgrounds tab activates in a popup session (deduplicated).
 
 #### `typography_tab_opened`
-- **Q:** What share of popup sessions ever surface the Typography tab? Symmetric with `quick_replies_preview_seen` and `backgrounds_tab_opened`.
+- **Q:** What share of popup sessions ever surface the Typography tab? Symmetric with `backgrounds_tab_opened`.
 - **Trigger:** First time the Typography tab activates in a popup session (deduplicated).
 
 #### `settings_gear_clicked`
@@ -536,58 +532,6 @@ After cutover, consumers should query the canonical name only. The PR that remov
 #### `font_scale_reset`
 - **Q:** Are users frequently resetting scale?
 - **Trigger:** User clicks Reset on the scale row.
-
-### Quick Replies (popup + WA Web)
-
-#### `quick_replies_enabled_toggled`
-- **Q:** What is the opt-in rate for quick reply bubbles? As of 1.1.18 the feature is opt-in (default OFF) and lazy-loaded — the WA-Web observer/DOM cost is paid only by users who enable it. This event measures adoption of the toggle going forward.
-- **Trigger:** User flips the "Enable quick reply bubbles" switch at the top of the Replies tab (`quick-replies.js`).
-- **Properties:**
-  - `enabled` *(boolean)* — new toggle state (`true` = feature turned on).
-
-#### `quick_replies_preview_seen`
-*Listed under Popup navigation above.*
-
-#### `quick_reply_first_added`
-- **Q:** First-time conversion: how many users move from "interested" to "engaged" with quick replies?
-- **Trigger:** First reply ever added by the user (across all sessions).
-
-#### `quick_reply_added`
-- **Q:** What's the growth curve of a user's reply library?
-- **Trigger:** Each reply added in the Replies tab.
-- **Properties:**
-  - `total_after` *(number)* — library size after add.
-
-#### `quick_reply_edited`
-- **Q:** Do users tune their replies?
-- **Trigger:** User edits an existing reply.
-
-#### `quick_reply_deleted`
-- **Q:** Library churn rate.
-- **Trigger:** User deletes a reply.
-- **Properties:**
-  - `total_after` *(number)*.
-
-#### `quick_reply_bubbles_shown`
-- **Q:** How often do the bubbles get painted? (Useful for spotting chat-switch noise.)
-- **Trigger:** Each render of the bubble bar on `web.whatsapp.com`. **Throttled to one emission per 10 seconds per page load** — without this throttle, WhatsApp's per-chat-switch DOM rebuilds would generate tens of events per minute. **When interpreting volume, account for the 10s throttle** — the count is "10-second windows that had at least one paint," not raw paint count.
-- **Properties:**
-  - `count` *(number)* — bubbles painted on this render (1–5).
-  - `qr_count_total` *(number)* — library size at paint time.
-
-#### `quick_reply_bubbles_session`
-- **Q:** Of WA-Web page sessions where bubbles appeared, what share converted to at least one insert? Conversion-rate denominator at the *session* level — `quick_reply_bubbles_shown` answers a different question (paint frequency).
-- **Trigger:** Page session unload (`pagehide` on `web.whatsapp.com`), fires only if at least one bubble was painted during the session.
-- **Properties:**
-  - `bubbles_shown_count` *(number)* — total across the page session (un-throttled — every paint contributes).
-  - `bubbles_inserted_count` *(number)* — total click-inserts.
-
-#### `quick_reply_inserted`
-- **Q:** Which slot positions get used? Random shuffle distribution check.
-- **Trigger:** User clicks a bubble on WA Web.
-- **Properties:**
-  - `bubble_position` *(number)* — 0–4.
-  - `bubbles_shown` *(number)* — count at click time.
 
 ### WhatsApp Web in-page
 
