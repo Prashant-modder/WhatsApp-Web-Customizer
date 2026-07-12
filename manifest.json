@@ -27,7 +27,6 @@
       "js": [
         "track.js",
         "changeContent.js",
-        "quick-reply-bubbles.js",
         "themes-presets.js",
         "themes-content.js",
         "fonts-presets.js",

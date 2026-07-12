@@ -27,8 +27,6 @@
     ".wc-ui-scope",
     "[data-wc-ui]",
     "#save-nudge",
-    "#quick-reply-bubbles",
-    ".quick-reply-bubble",
     "#wa-review-prompt-host",
     ".custom-burger-menu",
     "#custom-welcome-title",
