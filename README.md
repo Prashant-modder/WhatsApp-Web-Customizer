@@ -1,6 +1,6 @@
 # WhatsApp Web Customizer
 
-**Personalize WhatsApp Web like never before** — custom themes, backgrounds, 500+ fonts, animated effects, minimal mode, quick-reply bubbles, and AI-powered text suggestions.  
+**Personalize WhatsApp Web like never before** — custom themes, backgrounds, 500+ fonts, animated effects, minimal mode, and privacy blur.  
 Lightweight • Open Source • Privacy-First • No Tracking • Real-time Preview
 
 ![Visitor Count](https://hits.sh/github.com/BaskLash/WhatsApp-Web-Customizer.svg)
@@ -15,17 +15,8 @@ Lightweight • Open Source • Privacy-First • No Tracking • Real-time Prev
 - 🔤 **Fonts** — 500+ Google Fonts + custom font upload
 - 🌈 **Themes & Effects** — Dynamic colors, gradients, Disco Mode, button highlights
 - 🧹 **Minimal Mode** — Hide Archive/Status/Channels for focused chatting
-- 💬 **Quick Reply Bubbles** — Hover previews + fast responses (improvements coming)
-- 🤖 **Smart Text Suggestions** (v1.2+) — AI-powered reply prompts
+- 🔒 **Privacy Blur** — Blur names, message previews, and photos; hide typing/recording status
 - ⚡ **Instant Changes** — Apply customizations live without reload
-
-## 💡 Quick Replies Customization
-
-Quick Replies are fully customizable:  
-- Add, edit, or remove your own pre-defined messages  
-- Organize responses for fast access while chatting  
-- See live previews of your Quick Replies before using them  
-- Designed for speed and personalization to enhance your messaging workflow
 
 ## Demo / Screenshots
 
