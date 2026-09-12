@@ -3,11 +3,11 @@
 **Personalize WhatsApp Web like never before** — custom themes, backgrounds, 500+ fonts, animated effects, minimal mode, and privacy blur.  
 Lightweight • Open Source • Privacy-First • No Tracking • Real-time Preview
 
-![Visitor Count](https://hits.sh/github.com/BaskLash/WhatsApp-Web-Customizer.svg)
+![Visitor Count](https://hits.sh/github.com/olivierluethy/WhatsApp-Web-Customizer.svg)
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/pnelkhckhbbgaeilofckgeajggipnmkf.svg)](https://chromewebstore.google.com/detail/whatsapp-web-customizer/... )
 [![Chrome Web Store Users](https://img.shields.io/chrome-web-store/users/pnelkhckhbbgaeilofckgeajggipnmkf?label=users&logo=google-chrome&logoColor=white&color=4285F4)](https://chromewebstore.google.com/detail/whatsapp-web-customizer-%E2%80%93/pnelkhckhbbgaeilofckgeajggipnmkf)
-[![GitHub stars](https://img.shields.io/github/stars/BaskLash/WhatsApp-Web-Customizer?style=social)](https://github.com/BaskLash/WhatsApp-Web-Customizer)
-[![License](https://img.shields.io/github/license/BaskLash/WhatsApp-Web-Customizer)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/olivierluethy/WhatsApp-Web-Customizer?style=social)](https://github.com/olivierluethy/WhatsApp-Web-Customizer)
+[![License](https://img.shields.io/github/license/olivierluethy/WhatsApp-Web-Customizer)](LICENSE)
 
 ## ✨ Features
 
