@@ -42,9 +42,10 @@
         "privacy-blur.js",
         "dynamic-features.js",
         "content.js",
+        "slots-fix.js",
         "first-run-hint.js"
       ],
-      "css": ["adjustableChatList.css", "chatHoverPreview.css"],
+      "css": ["adjustableChatList.css", "chatHoverPreview.css", "slots-fix.css"],
       "run_at": "document_idle"
     }
   ],
