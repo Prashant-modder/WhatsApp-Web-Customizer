@@ -1113,6 +1113,11 @@ div.x1ecsr37 {
 ._ak4x {
   background: var(--wc-load-side) !important;
 }
+#main footer,
+#main div:has(> footer) {
+  box-shadow: none !important;
+  border: 0 !important;
+}
 * {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--wc-accent) 65%, transparent) transparent;
