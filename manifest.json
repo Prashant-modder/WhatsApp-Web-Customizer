@@ -3,49 +3,63 @@
   "name": "WhatsApp Web Customizer – Themes, Fonts, Backgrounds & Privacy",
   "version": "1.2.0",
   "description": "Customize WhatsApp Web: themes, fonts, backgrounds, font size, and privacy blur — blur names, previews & photos. Open source.",
-  "permissions": ["storage", "unlimitedStorage", "scripting", "clipboardRead", "alarms"],
-  "optional_host_permissions": ["<all_urls>"],
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "scripting",
+    "clipboardRead",
+    "alarms"
+  ],
+  "optional_host_permissions": [
+    "<all_urls>"
+  ],
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "src/popup/popup.html",
     "default_title": "WhatsApp Web Customizer"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background/background.js"
   },
   "options_ui": {
-    "page": "options.html",
+    "page": "src/pages/options/options.html",
     "open_in_tab": true
   },
   "icons": {
-    "16": "icon/icon16.png",
-    "48": "icon/icon48.png",
-    "128": "icon/icon128.png"
+    "16": "assets/icon/icon16.png",
+    "48": "assets/icon/icon48.png",
+    "128": "assets/icon/icon128.png"
   },
   "content_scripts": [
     {
-      "matches": ["https://web.whatsapp.com/"],
-      "js": [
-        "track.js",
-        "changeContent.js",
-        "themes-presets.js",
-        "themes-content.js",
-        "fonts-presets.js",
-        "fonts-content.js",
-        "reviewPrompt.js",
-        "water-bubbles.js",
-        "gradient-mesh.js",
-        "liquid-marble.js",
-        "cozy-window.js",
-        "animated-bg.js",
-        "adjustableChatList.js",
-        "chatHoverPreview.js",
-        "privacy-blur.js",
-        "dynamic-features.js",
-        "content.js",
-        "slots-fix.js",
-        "first-run-hint.js"
+      "matches": [
+        "https://web.whatsapp.com/"
       ],
-      "css": ["adjustableChatList.css", "chatHoverPreview.css", "slots-fix.css"],
+      "js": [
+        "src/shared/track.js",
+        "src/content/core/changeContent.js",
+        "src/shared/themes-presets.js",
+        "src/content/themes/themes-content.js",
+        "src/shared/fonts-presets.js",
+        "src/content/fonts/fonts-content.js",
+        "src/content/core/reviewPrompt.js",
+        "src/content/backgrounds/water-bubbles.js",
+        "src/content/backgrounds/gradient-mesh.js",
+        "src/content/backgrounds/liquid-marble.js",
+        "src/content/backgrounds/cozy-window.js",
+        "src/content/backgrounds/animated-bg.js",
+        "src/content/features/adjustableChatList.js",
+        "src/content/features/chatHoverPreview.js",
+        "src/content/features/privacy-blur.js",
+        "src/content/core/dynamic-features.js",
+        "src/content/core/content.js",
+        "src/content/slots/slots-fix.js",
+        "src/content/core/first-run-hint.js"
+      ],
+      "css": [
+        "src/content/features/adjustableChatList.css",
+        "src/content/features/chatHoverPreview.css",
+        "src/content/slots/slots-fix.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -56,14 +70,16 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "themes-overrides.css",
-        "icon/icon128.png",
-        "backgrounds/animated/*/index.html",
-        "backgrounds/animated/*/thumbnail.png",
-        "backgrounds/animated/*/thumbnail.gif",
-        "backgrounds/animated/*/thumbnail.svg"
+        "src/content/themes/themes-overrides.css",
+        "assets/icon/icon128.png",
+        "assets/backgrounds/animated/*/index.html",
+        "assets/backgrounds/animated/*/thumbnail.png",
+        "assets/backgrounds/animated/*/thumbnail.gif",
+        "assets/backgrounds/animated/*/thumbnail.svg"
       ],
-      "matches": ["https://web.whatsapp.com/*"]
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ]
     }
   ]
 }

@@ -1,0 +1,22 @@
+/* Chat view: let the slot image show through the theme's chat layers.
+   Header/footer keep their theme tint. */
+html.wc-slot-chat #main {
+  --wc-bg-diag: transparent;
+  --wc-bg-diag-alt: transparent;
+  --wc-bg-base: transparent;
+  --wc-load-main: transparent;
+  --wc-load-side: transparent;
+}
+
+/* Chat list: clear every theme layer inside the list; rows stay
+   slightly dark so text remains readable. */
+html.wc-slot-side #pane-side {
+  --wc-bg-diag: transparent;
+  --wc-bg-diag-alt: transparent;
+  --wc-bg-base: transparent;
+  --wc-bg-up: transparent;
+  --wc-bg-down: transparent;
+  --wc-load-main: transparent;
+  --wc-load-side: transparent;
+  --wc-load-item: rgba(0, 0, 0, 0.35);
+}

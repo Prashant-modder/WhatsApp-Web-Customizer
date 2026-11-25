@@ -1,6 +1,8 @@
+// Marks <html> with classes while a slot image is set, so slots-fix.css can
+// make the theme's opaque layers transparent and let the image show through.
 (function () {
   const map = { chatview: "wc-slot-chat", sidenav: "wc-slot-side" };
-  const ok = v => typeof v === "string" && v.startsWith("data:");
+  const ok = (v) => typeof v === "string" && v.startsWith("data:");
   function sync(s) {
     for (const k in map) document.documentElement.classList.toggle(map[k], ok(s[k]));
   }

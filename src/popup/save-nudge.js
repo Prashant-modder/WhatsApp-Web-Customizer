@@ -157,7 +157,7 @@
         hideNudge();
         // One-tap path into the manager's create/save flow.
         try {
-          var url = chrome.runtime.getURL("themes.html") + "#create";
+          var url = chrome.runtime.getURL("src/pages/themes/themes.html") + "#create";
           if (chrome.tabs && chrome.tabs.create) chrome.tabs.create({ url: url });
           else window.open(url, "_blank");
         } catch (e) {

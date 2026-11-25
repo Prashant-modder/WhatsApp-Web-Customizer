@@ -136,7 +136,7 @@
     } catch (e) {
       /* best-effort */
     }
-    const url = chrome.runtime.getURL("themes.html") + hash;
+    const url = chrome.runtime.getURL("src/pages/themes/themes.html") + hash;
     if (chrome.tabs && chrome.tabs.create) chrome.tabs.create({ url: url });
     else window.open(url, "_blank");
   }

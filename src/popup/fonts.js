@@ -134,7 +134,7 @@
     const source = opts && opts.source;
     const hash = (opts && opts.hash) || "";
     track("font_manager_opened", source ? { source: source } : undefined);
-    const url = chrome.runtime.getURL("fonts.html") + hash;
+    const url = chrome.runtime.getURL("src/pages/fonts/fonts.html") + hash;
     if (chrome.tabs && chrome.tabs.create) chrome.tabs.create({ url: url });
     else window.open(url, "_blank");
   }

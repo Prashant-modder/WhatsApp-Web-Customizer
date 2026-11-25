@@ -14,23 +14,24 @@
             content="WhatsApp Web, Customize WhatsApp, WhatsApp Chrome Extension, WhatsApp Web themes, WhatsApp Web backgrounds, WhatsApp Web font changer, hide WhatsApp features, personalize WhatsApp Web"
         />
 
-        <link rel="stylesheet" href="vendor/bootstrap/bootstrap.min.css" />
+        <link rel="stylesheet" href="../../assets/vendor/bootstrap/bootstrap.min.css" />
         <link
             href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
             rel="stylesheet"
         />
 
-        <script src="track.js" defer></script>
+        <script src="../shared/track.js" defer></script>
         <script src="popup-nav.js" defer></script>
         <script src="popup.js" defer></script>
+        <script src="welcome-options.js" defer></script>
         <script src="feature-toggles-popup.js" defer></script>
         <script src="fontSizeChange.js" defer></script>
         <script src="imageSelection.js" defer></script>
         <script src="preview-bar.js" defer></script>
-        <script src="themes-presets.js" defer></script>
+        <script src="../shared/themes-presets.js" defer></script>
         <script src="themes.js" defer></script>
         <script src="save-nudge.js" defer></script>
-        <script src="fonts-presets.js" defer></script>
+        <script src="../shared/fonts-presets.js" defer></script>
         <script src="fonts.js" defer></script>
         <script src="animated-bg-popup.js" defer></script>
         <script src="animated-bg-hint.js" defer></script>
@@ -1305,6 +1306,22 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                        <div class="mt-3">
+                            <h2 class="section-label mb-2">Welcome screen</h2>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="welcomeHide" />
+                                <label class="form-check-label" for="welcomeHide">
+                                    Hide WhatsApp's download card and shortcuts
+                                </label>
+                            </div>
+                            <label class="small text-secondary mb-1" for="welcomePos">Welcome text position</label>
+                            <select id="welcomePos" class="form-select form-select-sm">
+                                <option value="top">Top</option>
+                                <option value="center">Center</option>
+                                <option value="bottom">Bottom</option>
+                                <option value="off">Hidden</option>
+                            </select>
                         </div>
                         </div><!-- /#bg-static -->
 
