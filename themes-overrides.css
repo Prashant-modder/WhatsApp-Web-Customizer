@@ -1114,9 +1114,9 @@ div.x1ecsr37 {
   background: var(--wc-load-side) !important;
 }
 #main footer,
-#main div:has(> footer) {
-  box-shadow: none !important;
-  border: 0 !important;
+#main footer * {
+  background-repeat: no-repeat !important;
+  background-clip: padding-box !important;
 }
 * {
   scrollbar-width: thin;

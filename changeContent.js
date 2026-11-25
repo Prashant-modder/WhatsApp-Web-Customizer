@@ -1,1 +1,160 @@
-function isUsableSrc(e){return"string"==typeof e&&e.startsWith("data:")}function customThemes(){console.log("Starting custom themes...");setInterval(()=>{const e=document.getElementById("pane-side"),t=document.getElementById("main"),n=document.querySelector('div[tabindex="-1"][class^="two"]'),o=document.querySelector('div[role="grid"]'),a=document.querySelector("header[tabindex='0']");if(a&&chrome.storage.local.get(["navside"],e=>{const t=isUsableSrc(e.navside)?e.navside:null;t&&(a.style.backgroundImage=`url('${t}')`,a.style.backgroundSize="cover",a.style.backgroundPosition="center")}),(e||o)&&(t||n)){let n=document.getElementById("wa-chat-style");n||(n=document.createElement("style"),n.id="wa-chat-style",document.head.appendChild(n)),n.innerHTML='\n/* ── Chat list rows (light mode default) ── */\n#pane-side [role="row"] > div {\n    background: rgba(255, 255, 255, 0.6);\n    border-radius: 10px;\n    transition: background 0.15s ease;\n}\n#pane-side [role="row"]:hover > div {\n    background: rgba(0, 0, 0, 0.05);\n}\n#pane-side [aria-selected="true"] > div {\n    background: rgba(0, 0, 0, 0.08) !important;\n}\n#pane-side span[title] {\n    color: #111b21 !important;\n    font-weight: 500 !important;\n}\n#pane-side span[dir="auto"] {\n    color: rgba(17, 27, 33, 0.65) !important;\n    font-weight: 400 !important;\n}\n\n/* ── Dark-mode overrides (original look preserved) ── */\nbody.dark #pane-side [role="row"] > div {\n    background: rgba(0, 0, 0, 0.25);\n}\nbody.dark #pane-side [role="row"]:hover > div {\n    background: rgba(255, 255, 255, 0.1);\n}\nbody.dark #pane-side [aria-selected="true"] > div {\n    background: rgba(255, 255, 255, 0.2) !important;\n}\nbody.dark #pane-side span[title] {\n    color: #ffffff !important;\n}\nbody.dark #pane-side span[dir="auto"] {\n    color: rgba(255, 255, 255, 0.8) !important;\n}\n\n/* Chat-view header text — only force white in dark mode. Replaces the\n   former unconditional inline assignment that left the contact name\n   invisible against the native light header. */\nbody.dark div#main > header {\n    color: #ffffff !important;\n}\n',chrome.storage.local.get(["welcome","chatview","sidenav"],n=>{const o=isUsableSrc(n.welcome)?n.welcome:null,a=isUsableSrc(n.chatview)?n.chatview:null,r=isUsableSrc(n.sidenav)?n.sidenav:null;if(e&&r&&(e.style.backgroundImage=`url('${r}')`,e.style.backgroundSize="cover",e.style.backgroundPosition="center"),t&&a){const e=document.querySelector("[data-asset-chat-background-dark], [data-asset-chat-background-light]");e&&(e.style.backgroundImage="none"),t.style.backgroundImage=`url('${a}')`,t.style.backgroundSize="cover",t.style.backgroundPosition="center"}else t&&t.style.backgroundImage&&(t.style.backgroundImage="",t.style.backgroundSize="",t.style.backgroundPosition="");const l=document.querySelectorAll("div");let i=null;if(l.forEach(e=>{if(1!==e.classList.length)return;const t=e.children;if(3!==t.length)return;Array.from(t).every(e=>"BUTTON"===e.tagName)&&(i=e)}),i){const e=i.parentElement;if(e&&"SECTION"===e.tagName)if(e.style.backgroundImage=`url("${o}")`,e.style.backgroundSize="cover",e.style.backgroundPosition="center",e.style.backgroundRepeat="no-repeat",e.style.position="relative",e.style.display="flex",e.style.flexDirection="column",e.style.alignItems="center",e.style.justifyContent="center",e.style.textAlign="center",document.getElementById("custom-welcome-title"))console.log("Texte existieren bereits – kein Duplikat erstellt.");else{const t=document.createElement("h1");t.id="custom-welcome-title",t.textContent="Welcome To WhatsApp Web",t.style.color="white",t.style.fontSize="36px",t.style.fontWeight="bold",t.style.textShadow="2px 2px 8px rgba(0,0,0,0.7)",t.style.zIndex="10",t.style.margin="0",e.appendChild(t);const n=document.createElement("h2");n.id="custom-welcome-subtitle",n.textContent="Thanks for using WhatsApp Web Customizer!",n.style.color="rgba(255, 255, 255, 0.9)",n.style.fontSize="20px",n.style.fontWeight="400",n.style.textShadow="1px 1px 5px rgba(0,0,0,0.7)",n.style.zIndex="10",n.style.marginTop="10px",e.appendChild(n),console.log("Texte wurden neu erstellt.")}}})}const r=document.querySelector("div#main > header");r&&(r.style.background="none")},500)}customThemes();
+function isUsableSrc(e) {
+  return "string" == typeof e && e.startsWith("data:");
+}
+
+const WC_CSS = '\n/* ── Chat list rows (light mode default) ── */\n#pane-side [role="row"] > div {\n    background: rgba(255, 255, 255, 0.6);\n    border-radius: 10px;\n    transition: background 0.15s ease;\n}\n#pane-side [role="row"]:hover > div {\n    background: rgba(0, 0, 0, 0.05);\n}\n#pane-side [aria-selected="true"] > div {\n    background: rgba(0, 0, 0, 0.08) !important;\n}\n#pane-side span[title] {\n    color: #111b21 !important;\n    font-weight: 500 !important;\n}\n#pane-side span[dir="auto"] {\n    color: rgba(17, 27, 33, 0.65) !important;\n    font-weight: 400 !important;\n}\n\n/* ── Dark-mode overrides (original look preserved) ── */\nbody.dark #pane-side [role="row"] > div {\n    background: rgba(0, 0, 0, 0.25);\n}\nbody.dark #pane-side [role="row"]:hover > div {\n    background: rgba(255, 255, 255, 0.1);\n}\nbody.dark #pane-side [aria-selected="true"] > div {\n    background: rgba(255, 255, 255, 0.2) !important;\n}\nbody.dark #pane-side span[title] {\n    color: #ffffff !important;\n}\nbody.dark #pane-side span[dir="auto"] {\n    color: rgba(255, 255, 255, 0.8) !important;\n}\n\n/* Chat-view header text — only force white in dark mode. Replaces the\n   former unconditional inline assignment that left the contact name\n   invisible against the native light header. */\nbody.dark div#main > header {\n    color: #ffffff !important;\n}\n';
+
+const S = { welcome: null, chatview: null, sidenav: null, navside: null };
+const applied = new WeakMap();
+
+function loadSlots(cb) {
+  chrome.storage.local.get(["welcome", "chatview", "sidenav", "navside"], (r) => {
+    for (const k in S) S[k] = isUsableSrc(r[k]) ? r[k] : null;
+    cb && cb();
+  });
+}
+
+function setBg(el, src, extra) {
+  if (!el) return;
+  if (!src) {
+    if (applied.has(el)) {
+      el.style.backgroundImage = "";
+      el.style.backgroundSize = "";
+      el.style.backgroundPosition = "";
+      applied.delete(el);
+    }
+    return;
+  }
+  if (applied.get(el) === src) return;
+  applied.set(el, src);
+  el.style.backgroundImage = `url("${src}")`;
+  el.style.backgroundSize = "cover";
+  el.style.backgroundPosition = "center";
+  if (extra) Object.assign(el.style, extra);
+}
+
+let welcomeSection = null;
+function findWelcomeSection() {
+  if (welcomeSection && welcomeSection.isConnected) return welcomeSection;
+  welcomeSection = null;
+  for (const s of document.querySelectorAll("section")) {
+    for (const d of s.children) {
+      if (
+        d.tagName === "DIV" &&
+        d.classList.length === 1 &&
+        d.children.length === 3 &&
+        Array.from(d.children).every((c) => c.tagName === "BUTTON")
+      ) {
+        welcomeSection = s;
+        return s;
+      }
+    }
+  }
+  return null;
+}
+
+function addWelcomeText(section) {
+  if (document.getElementById("custom-welcome-title")) return;
+  const h1 = document.createElement("h1");
+  h1.id = "custom-welcome-title";
+  h1.textContent = "Welcome To WhatsApp Web";
+  Object.assign(h1.style, {
+    color: "white",
+    fontSize: "36px",
+    fontWeight: "bold",
+    textShadow: "2px 2px 8px rgba(0,0,0,0.7)",
+    zIndex: "10",
+    margin: "0",
+  });
+  section.appendChild(h1);
+  const h2 = document.createElement("h2");
+  h2.id = "custom-welcome-subtitle";
+  h2.textContent = "Thanks for using WhatsApp Web Customizer!";
+  Object.assign(h2.style, {
+    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: "20px",
+    fontWeight: "400",
+    textShadow: "1px 1px 5px rgba(0,0,0,0.7)",
+    zIndex: "10",
+    marginTop: "10px",
+  });
+  section.appendChild(h2);
+}
+
+function applyAll() {
+  const side = document.getElementById("pane-side");
+  const main = document.getElementById("main");
+  const two = document.querySelector('div[tabindex="-1"][class^="two"]');
+  const grid = document.querySelector('div[role="grid"]');
+  const navHeader = document.querySelector("header[tabindex='0']");
+
+  setBg(navHeader, S.navside);
+
+  if ((side || grid) && (main || two)) {
+    let st = document.getElementById("wa-chat-style");
+    if (!st) {
+      st = document.createElement("style");
+      st.id = "wa-chat-style";
+      document.head.appendChild(st);
+    }
+    if (st.__wcCss !== WC_CSS) {
+      st.__wcCss = WC_CSS;
+      st.innerHTML = WC_CSS;
+    }
+
+    setBg(side, S.sidenav);
+
+    if (main && S.chatview) {
+      const dark = document.querySelector(
+        "[data-asset-chat-background-dark], [data-asset-chat-background-light]",
+      );
+      if (dark && dark.style.backgroundImage !== "none") dark.style.backgroundImage = "none";
+    }
+    setBg(main, S.chatview);
+
+    if (S.welcome) {
+      const section = findWelcomeSection();
+      if (section) {
+        setBg(section, S.welcome, {
+          backgroundRepeat: "no-repeat",
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+        });
+        addWelcomeText(section);
+      }
+    }
+  }
+
+  const hdr = document.querySelector("div#main > header");
+  if (hdr && hdr.dataset.wcH !== "1") {
+    hdr.dataset.wcH = "1";
+    hdr.style.background = "none";
+  }
+}
+
+let wcStarted = false;
+function customThemes() {
+  if (wcStarted) return;
+  wcStarted = true;
+  let timer = null;
+  const schedule = () => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      applyAll();
+    }, 250);
+  };
+  loadSlots(applyAll);
+  chrome.storage.onChanged.addListener((c, area) => {
+    if (area === "local") loadSlots(applyAll);
+  });
+  new MutationObserver(schedule).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+}
+customThemes();
